@@ -18,13 +18,14 @@
     "cap:init": "npx cap init 'DDL Retailer' com.ddlplatform.retailer --web-dir out",
     "cap:add:android": "npx cap add android",
     "cap:add:ios": "npx cap add ios",
-    "cap:sync": "npm run build:static && npx cap sync",
+    "cap:sync": "npx cap sync",
     "cap:open:android": "npx cap open android",
     "cap:open:ios": "npx cap open ios",
     "cap:run:android": "npx cap run android",
     "cap:run:ios": "npx cap run ios",
-    "mobile:setup": "npm run build:static && npx cap add android && npx cap add ios",
-    "mobile:build": "npm run build:static && npx cap sync"
+    "mobile:setup": "npx cap add android && npx cap add ios",
+    "mobile:build": "npm run build:static && npx cap sync",
+    "mobile:run": "npm run mobile:build && npx cap run android"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

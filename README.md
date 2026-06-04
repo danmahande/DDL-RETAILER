@@ -55,24 +55,41 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - **Xcode** (for iOS builds, Mac only) — [Download](https://developer.apple.com/xcode/)
 - **Java JDK 17+** (for Android)
 
-### Setup
+### Windows Quick Build
+
+On Windows PowerShell, use the included build script:
+
+```powershell
+# Build for mobile (static export + Capacitor sync)
+.\build.ps1 -Target mobile
+
+# Or just run the default:
+.\build.ps1
+```
+
+This will automatically:
+1. Temporarily move API routes aside (they don't work with static export)
+2. Build the Next.js static export to the `out/` folder
+3. Restore API routes
+4. Sync the `out/` folder into the Capacitor Android/iOS projects
+
+### Mac/Linux Build
 
 ```bash
-# 1. Build the static export
+# Using the bash script:
+bash build.sh mobile
+
+# Or manually:
 npm run build:static
-
-# 2. Add platforms (first time only)
-npx cap add android
-npx cap add ios
-
-# 3. Sync web code to native projects
 npx cap sync
 ```
 
 ### Run on Android
 
+After building, run on your connected phone:
+
 ```bash
-# Option A: Run on connected device/emulator
+# Option A: Run directly on connected device/emulator
 npx cap run android
 
 # Option B: Open in Android Studio
