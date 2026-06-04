@@ -249,6 +249,29 @@ function SignalModal({
   const [quantity, setQuantity] = useState(1);
   const [urgency, setUrgency] = useState('normal');
   const [notes, setNotes] = useState('');
+  const [gpsStatus, setGpsStatus] = useState<'capturing' | 'captured' | 'unavailable'>('capturing');
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Capture GPS on modal open
+  useEffect(() => {
+    let cancelled = false;
+    async function getGps() {
+      try {
+        const pos = await getCurrentPosition();
+        if (cancelled) return;
+        if (pos) {
+          setGpsStatus('captured');
+          setGpsCoords({ lat: pos.latitude, lng: pos.longitude });
+        } else {
+          setGpsStatus('unavailable');
+        }
+      } catch {
+        if (!cancelled) setGpsStatus('unavailable');
+      }
+    }
+    getGps();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <motion.div
@@ -324,9 +347,39 @@ function SignalModal({
             <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g., Need before Friday" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
           </div>
 
-          <div className="flex items-center gap-2 px-1">
-            <Crosshair className="w-3.5 h-3.5 text-gray-400" />
-            <p className="text-[11px] text-gray-400">Your location will be attached to this signal for map display</p>
+          {/* GPS Status Indicator */}
+          <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${
+            gpsStatus === 'captured' ? 'bg-green-50 border-green-200' :
+            gpsStatus === 'unavailable' ? 'bg-amber-50 border-amber-200' :
+            'bg-gray-50 border-gray-200'
+          }`}>
+            {gpsStatus === 'capturing' && (
+              <>
+                <RefreshCw className="w-4 h-4 text-gray-500 animate-spin" />
+                <div>
+                  <p className="text-xs font-semibold text-gray-700">Getting your location...</p>
+                  <p className="text-[10px] text-gray-400">GPS coordinates will be attached to this signal</p>
+                </div>
+              </>
+            )}
+            {gpsStatus === 'captured' && gpsCoords && (
+              <>
+                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-green-700">Location captured</p>
+                  <p className="text-[10px] text-green-500 font-mono">{gpsCoords.lat.toFixed(4)}, {gpsCoords.lng.toFixed(4)}</p>
+                </div>
+              </>
+            )}
+            {gpsStatus === 'unavailable' && (
+              <>
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-700">Location unavailable</p>
+                  <p className="text-[10px] text-amber-500">Signal will be sent without GPS coordinates</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -420,13 +473,13 @@ function SignalsScreen({
                     <span className="font-mono text-[10px] text-gray-400">{signal.signalId}</span>
                     <span className="text-[10px] text-gray-300">·</span>
                     <span className="text-[10px] text-gray-400">Qty: {signal.quantity}</span>
-                    {signal.latitude != null && (
-                      <>
-                        <span className="text-[10px] text-gray-300">·</span>
-                        <MapPin className="w-2.5 h-2.5 text-gray-400" />
-                      </>
-                    )}
                   </div>
+                  {signal.latitude != null && (
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <MapPin className="w-2.5 h-2.5 text-green-500" />
+                      <span className="text-[9px] text-green-600 font-mono">{signal.latitude.toFixed(4)}, {signal.longitude?.toFixed(4)}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${URGENCY_COLORS[signal.urgency]}`}>{signal.urgency}</span>
@@ -506,8 +559,13 @@ function HistoryScreen({ signals }: { signals: DemandSignal[] }) {
                       <span className="font-mono text-[10px] text-gray-400">{signal.signalId}</span>
                       <span className="text-[10px] text-gray-300">·</span>
                       <span className="text-[10px] text-gray-400">Qty {signal.quantity} · {signal.urgency}</span>
-                      {signal.latitude != null && <MapPin className="w-2.5 h-2.5 text-gray-400 ml-1" />}
                     </div>
+                    {signal.latitude != null && (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <MapPin className="w-2.5 h-2.5 text-green-500" />
+                        <span className="text-[9px] text-green-600 font-mono">{signal.latitude.toFixed(4)}, {signal.longitude?.toFixed(4)}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_COLORS[signal.status]}`}>{STATUS_LABELS[signal.status]}</span>
