@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  productId    String   @unique
+  productLabel String
+  brand        String?
+  category     String
+  unit         String
+  priceTier    String   // budget, mid-range, premium
+  packageSize  String   // sachet, small, medium, large, bulk
+  unitCost     Float
+  unitPrice    Float
+  currentStock Int      @default(0)
+  minStock     Int      @default(10)
+  merchantId   String?
+  merchantName String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model DemandSignal {
+  id              String    @id @default(cuid())
+  signalId        String    @unique
+  shopkeeperId    String    @default("SK-RETAIL-001")
+  neighborhood    String    @default("Bugolobi Market")
+  productCategory String
+  productLabel    String
+  productId       String
+  packageSize     String    // sachet, small, medium, large, bulk
+  priceTier       String    // budget, mid-range, premium
+  quantity        Int        @default(1)
+  urgency         String    @default("normal") // urgent, normal, low
+  status          String    @default("pending") // pending, synced, assigned, in_transit, delivered, cancelled
+  latitude        Float?
+  longitude       Float?
+  isSynced        Boolean   @default(false)
+  syncedAt        DateTime?
+  privacyApplied  Boolean   @default(false)
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model RetailerProfile {
+  id           String  @id @default(cuid())
+  shopkeeperId String  @unique
+  businessName String
+  contact      String
+  email        String?
+  neighborhood String
+  latitude     Float?
+  longitude    Float?
+  isActive     Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
