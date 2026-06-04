@@ -23,6 +23,15 @@ import {
   RefreshCw,
   TrendingUp,
   Search,
+  Server,
+  Link2,
+  Settings,
+  Shield,
+  Crosshair,
+  Eye,
+  EyeOff,
+  Save,
+  Zap,
 } from 'lucide-react';
 import {
   seedLocalData,
@@ -30,14 +39,21 @@ import {
   getLocalSignals,
   createLocalSignal,
   syncLocalSignals,
+  syncToSupplierApi,
   getLocalProfile,
+  getConnectionSettings,
+  updateConnectionSettings,
+  isSupplierConnected,
   isNativeApp,
+  getCurrentPosition,
+  testSupplierConnection,
   type LocalProduct as Product,
   type LocalDemandSignal as DemandSignal,
   type LocalRetailerProfile as RetailerProfile,
+  type ConnectionSettings,
 } from '@/lib/local-db';
 
-// ─── Types (using local-db types) ───────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 type TabId = 'inventory' | 'signals' | 'history' | 'profile';
 
@@ -307,6 +323,11 @@ function SignalModal({
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Notes (optional)</label>
             <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g., Need before Friday" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
           </div>
+
+          <div className="flex items-center gap-2 px-1">
+            <Crosshair className="w-3.5 h-3.5 text-gray-400" />
+            <p className="text-[11px] text-gray-400">Your location will be attached to this signal for map display</p>
+          </div>
         </div>
 
         <div className="px-6 pb-8 pt-2 flex gap-3">
@@ -329,12 +350,14 @@ function SignalsScreen({
   onCreateSignal,
   onSync,
   isSyncing,
+  supplierConnected,
 }: {
   signals: DemandSignal[];
   products: Product[];
   onCreateSignal: (product: Product) => void;
   onSync: () => void;
   isSyncing: boolean;
+  supplierConnected: boolean;
 }) {
   const unsynced = signals.filter((s) => !s.isSynced);
   const activeSignals = signals.filter((s) => s.status !== 'delivered' && s.status !== 'cancelled');
@@ -346,10 +369,17 @@ function SignalsScreen({
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">Demand Signals</h1>
           <button onClick={onSync} disabled={isSyncing || unsynced.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-full disabled:opacity-40 active:bg-gray-800 transition-colors">
             {isSyncing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-            Sync {unsynced.length > 0 && `(${unsynced.length})`}
+            {supplierConnected ? 'Sync' : 'Mark Synced'} {unsynced.length > 0 && `(${unsynced.length})`}
           </button>
         </div>
-        <p className="text-xs text-gray-400">Tap products below to create demand signals</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-gray-400">Tap products below to create demand signals</p>
+          {supplierConnected && (
+            <span className="flex items-center gap-1 text-[10px] text-green-600 font-semibold">
+              <Server className="w-3 h-3" /> Linked
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="px-4 pb-3">
@@ -390,6 +420,12 @@ function SignalsScreen({
                     <span className="font-mono text-[10px] text-gray-400">{signal.signalId}</span>
                     <span className="text-[10px] text-gray-300">·</span>
                     <span className="text-[10px] text-gray-400">Qty: {signal.quantity}</span>
+                    {signal.latitude != null && (
+                      <>
+                        <span className="text-[10px] text-gray-300">·</span>
+                        <MapPin className="w-2.5 h-2.5 text-gray-400" />
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
@@ -470,6 +506,7 @@ function HistoryScreen({ signals }: { signals: DemandSignal[] }) {
                       <span className="font-mono text-[10px] text-gray-400">{signal.signalId}</span>
                       <span className="text-[10px] text-gray-300">·</span>
                       <span className="text-[10px] text-gray-400">Qty {signal.quantity} · {signal.urgency}</span>
+                      {signal.latitude != null && <MapPin className="w-2.5 h-2.5 text-gray-400 ml-1" />}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
@@ -486,6 +523,149 @@ function HistoryScreen({ signals }: { signals: DemandSignal[] }) {
   );
 }
 
+// ─── Connection Settings Modal ──────────────────────────────────────────────
+
+function ConnectionModal({
+  connection,
+  onSave,
+  onClose,
+}: {
+  connection: ConnectionSettings;
+  onSave: (settings: ConnectionSettings) => void;
+  onClose: () => void;
+}) {
+  const [url, setUrl] = useState(connection.supplierApiUrl);
+  const [apiKey, setApiKey] = useState(connection.apiKey);
+  const [autoSync, setAutoSync] = useState(connection.autoSync);
+  const [showKey, setShowKey] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const handleTest = async () => {
+    if (!url.trim()) return;
+    setTesting(true);
+    setTestResult(null);
+    const result = await testSupplierConnection(url.trim(), apiKey.trim() || undefined);
+    setTestResult(result);
+    setTesting(false);
+  };
+
+  const handleSave = () => {
+    onSave({
+      supplierApiUrl: url.trim(),
+      apiKey: apiKey.trim(),
+      autoSync,
+      syncIntervalMinutes: connection.syncIntervalMinutes,
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        className="w-full max-w-lg bg-white rounded-t-3xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-gray-200 rounded-full" />
+        </div>
+
+        <div className="px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 bg-[#FF6B35]/10 rounded-xl flex items-center justify-center">
+              <Link2 className="w-5 h-5 text-[#FF6B35]" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Supplier Connection</h3>
+              <p className="text-xs text-gray-400">Link to the supplier dashboard</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Supplier Dashboard URL</label>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="http://192.168.1.100:3000 or https://your-dashboard.com"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B35] focus:border-transparent font-mono text-[13px]"
+            />
+            <p className="text-[10px] text-gray-400 mt-1.5 px-1">Enter the URL where the supplier dashboard is running. Use your computer&apos;s local IP for same-network access.</p>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">API Key (optional)</label>
+            <div className="relative">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Enter API key if required"
+                className="w-full px-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B35] focus:border-transparent font-mono text-[13px]"
+              />
+              <button onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2">
+                {showKey ? <EyeOff className="w-4 h-4 text-gray-400" /> : <Eye className="w-4 h-4 text-gray-400" />}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1.5 px-1">If the supplier dashboard requires authentication, enter the API key here.</p>
+          </div>
+
+          <div className="flex items-center justify-between px-1">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Auto Sync</p>
+              <p className="text-[10px] text-gray-400">Automatically send signals when online</p>
+            </div>
+            <button
+              onClick={() => setAutoSync(!autoSync)}
+              className={`w-11 h-6 rounded-full transition-colors ${autoSync ? 'bg-[#FF6B35]' : 'bg-gray-200'} relative`}
+            >
+              <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-0.5 transition-transform ${autoSync ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+
+          {url.trim() && (
+            <div>
+              <button
+                onClick={handleTest}
+                disabled={testing}
+                className="w-full py-3 rounded-xl border border-[#FF6B35] text-[#FF6B35] font-semibold text-sm active:bg-[#FF6B35]/5 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {testing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                Test Connection
+              </button>
+              {testResult && (
+                <div className={`mt-2 p-3 rounded-xl text-xs font-medium ${testResult.ok ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                  {testResult.ok ? <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" /> : <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5" />}
+                  {testResult.message}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 pb-8 pt-2 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-3.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm active:bg-gray-50 transition-colors">Cancel</button>
+          <button onClick={handleSave} className="flex-1 py-3.5 rounded-xl bg-[#FF6B35] text-white font-semibold text-sm active:bg-[#E55A2B] transition-colors flex items-center justify-center gap-2">
+            <Save className="w-4 h-4" />
+            Save
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── Profile Screen ──────────────────────────────────────────────────────────
 
 function ProfileScreen({
@@ -496,6 +676,9 @@ function ProfileScreen({
   onSync,
   isSyncing,
   nativeMode,
+  connection,
+  onOpenConnectionSettings,
+  lastSyncResult,
 }: {
   profile: RetailerProfile | null;
   unsyncedCount: number;
@@ -504,7 +687,12 @@ function ProfileScreen({
   onSync: () => void;
   isSyncing: boolean;
   nativeMode: boolean;
+  connection: ConnectionSettings;
+  onOpenConnectionSettings: () => void;
+  lastSyncResult: string | null;
 }) {
+  const connected = isSupplierConnected();
+
   return (
     <div className="flex flex-col h-full bg-white">
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4">
@@ -521,11 +709,32 @@ function ProfileScreen({
           </div>
         </div>
 
+        {/* Connection Status */}
+        <button onClick={onOpenConnectionSettings} className="w-full text-left mb-4">
+          <div className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-colors ${connected ? 'bg-[#FF6B35]/5 border-[#FF6B35]/20' : 'bg-gray-50 border-gray-200'}`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${connected ? 'bg-[#FF6B35]/10' : 'bg-gray-100'}`}>
+              <Server className={`w-5 h-5 ${connected ? 'text-[#FF6B35]' : 'text-gray-400'}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-semibold ${connected ? 'text-[#FF6B35]' : 'text-gray-500'}`}>
+                {connected ? 'Connected to Supplier' : 'Not Connected'}
+              </p>
+              <p className="text-[10px] text-gray-400 truncate">
+                {connected ? connection.supplierApiUrl : 'Tap to configure supplier dashboard link'}
+              </p>
+              {lastSyncResult && (
+                <p className="text-[10px] text-gray-400 mt-0.5">{lastSyncResult}</p>
+              )}
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-300" />
+          </div>
+        </button>
+
         <div className={`flex items-center gap-3 p-4 rounded-2xl mb-4 ${isOnline ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
           {isOnline ? <Wifi className="w-5 h-5 text-green-600" /> : <WifiOff className="w-5 h-5 text-red-600" />}
           <div className="flex-1">
             <p className={`text-sm font-semibold ${isOnline ? 'text-green-700' : 'text-red-700'}`}>{isOnline ? 'Online' : 'Offline'}</p>
-            <p className="text-xs text-gray-500">{isOnline ? 'Signals will be synced automatically' : 'Signals saved locally until connection restored'}</p>
+            <p className="text-xs text-gray-500">{isOnline ? (connected ? 'Signals will be sent to supplier dashboard' : 'Signals saved locally — connect to supplier') : 'Signals saved locally until connection restored'}</p>
           </div>
         </div>
 
@@ -537,7 +746,7 @@ function ProfileScreen({
             </div>
             <button onClick={onSync} disabled={isSyncing || unsyncedCount === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-full disabled:opacity-40 active:bg-gray-800 transition-colors">
               {isSyncing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-              Sync Now
+              {connected ? 'Sync Now' : 'Mark Synced'}
             </button>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -581,7 +790,7 @@ function ProfileScreen({
             </div>
             <span className="text-sm font-bold text-gray-900">DDL Platform</span>
           </div>
-          <p className="text-[10px] text-gray-400">Direct Demand-to-Logistics v1.0</p>
+          <p className="text-[10px] text-gray-400">Direct Demand-to-Logistics v2.0</p>
           <p className="text-[10px] text-gray-300">Bugolobi, Kampala · {nativeMode ? 'Native App' : 'Retailer App'}</p>
         </div>
       </div>
@@ -596,41 +805,36 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [signals, setSignals] = useState<DemandSignal[]>([]);
   const [profile, setProfile] = useState<RetailerProfile | null>(null);
+  const [connection, setConnection] = useState<ConnectionSettings>(getConnectionSettings());
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [nativeMode, setNativeMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState<string | null>(null);
 
   // Initialize data
   useEffect(() => {
     async function initData() {
       try {
-        // Seed local data first
         seedLocalData();
-
-        // Check if running as native app
         const native = isNativeApp();
         setNativeMode(native);
 
         if (native) {
-          // Native mode: use localStorage
           setProducts(getLocalProducts());
           setSignals(getLocalSignals());
           setProfile(getLocalProfile());
         } else {
-          // Web mode: try API first, fall back to localStorage
           try {
-            // Seed server DB
             await fetch('/api/seed', { method: 'POST' });
-
             const [productsRes, signalsRes, profileRes] = await Promise.all([
               fetch('/api/products'),
               fetch('/api/signals'),
               fetch('/api/profile'),
             ]);
-
             const productsData = await productsRes.json();
             const signalsData = await signalsRes.json();
             const profileData = await profileRes.json();
@@ -644,7 +848,6 @@ export default function Home() {
             if (profileData.success) setProfile(profileData.data);
             else setProfile(getLocalProfile());
           } catch {
-            // API not available (static export) — use localStorage
             setProducts(getLocalProducts());
             setSignals(getLocalSignals());
             setProfile(getLocalProfile());
@@ -652,7 +855,6 @@ export default function Home() {
         }
       } catch (err) {
         console.error('Init error:', err);
-        // Ultimate fallback
         setProducts(getLocalProducts());
         setSignals(getLocalSignals());
         setProfile(getLocalProfile());
@@ -676,12 +878,28 @@ export default function Home() {
     };
   }, []);
 
-  // Create demand signal
+  // Auto-sync when coming online and connected
+  useEffect(() => {
+    if (!isOnline || !connection.supplierApiUrl || !connection.autoSync) return;
+    const unsynced = getLocalSignals().filter(s => !s.isSynced);
+    if (unsynced.length === 0) return;
+    // Auto-sync after a short delay
+    const timer = setTimeout(() => {
+      handleSync();
+    }, 3000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline, connection.supplierApiUrl, connection.autoSync]);
+
+  // Create demand signal with geolocation
   const handleCreateSignal = useCallback(
     async (data: { quantity: number; urgency: string; notes: string }) => {
       if (!selectedProduct) return;
       setIsSubmitting(true);
       try {
+        // Capture GPS position
+        const position = await getCurrentPosition();
+
         // Always save to localStorage first (instant, works offline)
         const newSignal = createLocalSignal({
           productLabel: selectedProduct.productLabel,
@@ -693,6 +911,9 @@ export default function Home() {
           urgency: data.urgency,
           neighborhood: profile?.neighborhood || 'Bugolobi Market',
           notes: data.notes,
+          latitude: position?.latitude ?? null,
+          longitude: position?.longitude ?? null,
+          locationAccuracy: position?.accuracy ?? null,
         });
         setSignals((prev) => [newSignal, ...prev]);
 
@@ -712,6 +933,9 @@ export default function Home() {
                 urgency: data.urgency,
                 neighborhood: profile?.neighborhood || 'Bugolobi Market',
                 notes: data.notes,
+                latitude: position?.latitude ?? null,
+                longitude: position?.longitude ?? null,
+                locationAccuracy: position?.accuracy ?? null,
               }),
             });
           } catch {
@@ -729,15 +953,34 @@ export default function Home() {
     [selectedProduct, profile, nativeMode]
   );
 
-  // Sync signals
+  // Sync signals to supplier dashboard
   const handleSync = useCallback(async () => {
     setIsSyncing(true);
+    setLastSyncResult(null);
     try {
-      // Sync local storage
-      const result = syncLocalSignals();
+      const currentProfile = profile || getLocalProfile();
+
+      if (isSupplierConnected()) {
+        // Real sync to supplier API
+        const result = await syncToSupplierApi(connection, currentProfile);
+        if (result.synced > 0) {
+          setLastSyncResult(`Synced ${result.synced} signal${result.synced !== 1 ? 's' : ''} to supplier`);
+        }
+        if (result.failed > 0) {
+          setLastSyncResult(`Synced ${result.synced}, failed ${result.failed}`);
+        }
+        if (result.synced === 0 && result.failed === 0) {
+          setLastSyncResult('All signals already synced');
+        }
+      } else {
+        // Local-only sync
+        const result = syncLocalSignals();
+        setLastSyncResult(`Marked ${result.synced} signal${result.synced !== 1 ? 's' : ''} as synced (local only)`);
+      }
+
       setSignals(getLocalSignals());
 
-      // Also try API sync
+      // Also try API sync in web mode
       if (!nativeMode) {
         try {
           await fetch('/api/sync', { method: 'POST' });
@@ -750,12 +993,20 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Sync error:', err);
+      setLastSyncResult('Sync failed — try again');
     } finally {
       setIsSyncing(false);
     }
-  }, [nativeMode]);
+  }, [connection, profile, nativeMode]);
+
+  const handleSaveConnection = useCallback((settings: ConnectionSettings) => {
+    updateConnectionSettings(settings);
+    setConnection(settings);
+    setShowConnectionModal(false);
+  }, []);
 
   const unsyncedCount = signals.filter((s) => !s.isSynced).length;
+  const supplierConnected = isSupplierConnected();
 
   if (isLoading) {
     return (
@@ -790,9 +1041,9 @@ export default function Home() {
             className="h-full"
           >
             {activeTab === 'inventory' && <InventoryScreen products={products} onSelectProduct={setSelectedProduct} />}
-            {activeTab === 'signals' && <SignalsScreen signals={signals} products={products} onCreateSignal={setSelectedProduct} onSync={handleSync} isSyncing={isSyncing} />}
+            {activeTab === 'signals' && <SignalsScreen signals={signals} products={products} onCreateSignal={setSelectedProduct} onSync={handleSync} isSyncing={isSyncing} supplierConnected={supplierConnected} />}
             {activeTab === 'history' && <HistoryScreen signals={signals} />}
-            {activeTab === 'profile' && <ProfileScreen profile={profile} unsyncedCount={unsyncedCount} totalSignals={signals.length} isOnline={isOnline} onSync={handleSync} isSyncing={isSyncing} nativeMode={nativeMode} />}
+            {activeTab === 'profile' && <ProfileScreen profile={profile} unsyncedCount={unsyncedCount} totalSignals={signals.length} isOnline={isOnline} onSync={handleSync} isSyncing={isSyncing} nativeMode={nativeMode} connection={connection} onOpenConnectionSettings={() => setShowConnectionModal(true)} lastSyncResult={lastSyncResult} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -801,6 +1052,13 @@ export default function Home() {
         <div className="bg-amber-500 text-white text-center py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5">
           <WifiOff className="w-3.5 h-3.5" />
           Offline — signals saved locally
+        </div>
+      )}
+
+      {!supplierConnected && isOnline && (
+        <div className="bg-gray-900 text-white text-center py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer" onClick={() => setShowConnectionModal(true)}>
+          <Link2 className="w-3.5 h-3.5" />
+          Not connected to supplier — tap to configure
         </div>
       )}
 
@@ -827,6 +1085,10 @@ export default function Home() {
 
       <AnimatePresence>
         {selectedProduct && <SignalModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onSubmit={handleCreateSignal} isSubmitting={isSubmitting} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showConnectionModal && <ConnectionModal connection={connection} onSave={handleSaveConnection} onClose={() => setShowConnectionModal(false)} />}
       </AnimatePresence>
     </div>
   );

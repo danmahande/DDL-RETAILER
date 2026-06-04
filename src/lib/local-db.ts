@@ -37,6 +37,10 @@ export interface LocalDemandSignal {
   privacyApplied: boolean;
   notes: string | null;
   createdAt: string;
+  // Geolocation fields — captured via device GPS
+  latitude: number | null;
+  longitude: number | null;
+  locationAccuracy: number | null;
 }
 
 export interface LocalRetailerProfile {
@@ -48,10 +52,25 @@ export interface LocalRetailerProfile {
   neighborhood: string;
 }
 
+export interface ConnectionSettings {
+  supplierApiUrl: string;
+  apiKey: string;
+  autoSync: boolean;
+  syncIntervalMinutes: number;
+}
+
 const PRODUCTS_KEY = 'ddl_products';
 const SIGNALS_KEY = 'ddl_signals';
 const PROFILE_KEY = 'ddl_profile';
 const SEEDED_KEY = 'ddl_seeded';
+const CONNECTION_KEY = 'ddl_connection';
+
+const DEFAULT_CONNECTION: ConnectionSettings = {
+  supplierApiUrl: '',
+  apiKey: '',
+  autoSync: true,
+  syncIntervalMinutes: 5,
+};
 
 // ─── Demo Data ─────────────────────────────────────────────────────────────
 
@@ -83,12 +102,12 @@ const DEMO_PRODUCTS: LocalProduct[] = [
 ];
 
 const DEMO_SIGNALS: LocalDemandSignal[] = [
-  { id: 's1', signalId: 'SIG-0001', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Beverages', productLabel: 'Soda 500ml', productId: 'BV-01', packageSize: 'small', priceTier: 'budget', quantity: 5, urgency: 'urgent', status: 'pending', isSynced: false, syncedAt: null, privacyApplied: false, notes: null, createdAt: new Date(Date.now() - 2 * 3600000).toISOString() },
-  { id: 's2', signalId: 'SIG-0002', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Groceries', productLabel: 'Cooking Oil 2L', productId: 'GR-05', packageSize: 'large', priceTier: 'mid-range', quantity: 3, urgency: 'urgent', status: 'pending', isSynced: false, syncedAt: null, privacyApplied: false, notes: null, createdAt: new Date(Date.now() - 2.5 * 3600000).toISOString() },
-  { id: 's3', signalId: 'SIG-0003', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Dairy', productLabel: 'Milk 1L', productId: 'DR-01', packageSize: 'medium', priceTier: 'budget', quantity: 10, urgency: 'normal', status: 'synced', isSynced: true, syncedAt: new Date(Date.now() - 3 * 3600000).toISOString(), privacyApplied: true, notes: null, createdAt: new Date(Date.now() - 4 * 3600000).toISOString() },
-  { id: 's4', signalId: 'SIG-0004', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Bakery', productLabel: 'Bread', productId: 'BK-01', packageSize: 'medium', priceTier: 'budget', quantity: 20, urgency: 'normal', status: 'assigned', isSynced: true, syncedAt: new Date(Date.now() - 4 * 3600000).toISOString(), privacyApplied: true, notes: null, createdAt: new Date(Date.now() - 5 * 3600000).toISOString() },
-  { id: 's5', signalId: 'SIG-0005', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Groceries', productLabel: 'Sugar 1kg', productId: 'GR-01', packageSize: 'medium', priceTier: 'budget', quantity: 8, urgency: 'low', status: 'in_transit', isSynced: true, syncedAt: new Date(Date.now() - 5 * 3600000).toISOString(), privacyApplied: true, notes: null, createdAt: new Date(Date.now() - 6 * 3600000).toISOString() },
-  { id: 's6', signalId: 'SIG-0006', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Cleaning', productLabel: 'Detergent 1kg', productId: 'CL-02', packageSize: 'medium', priceTier: 'mid-range', quantity: 4, urgency: 'normal', status: 'delivered', isSynced: true, syncedAt: new Date(Date.now() - 6 * 3600000).toISOString(), privacyApplied: true, notes: null, createdAt: new Date(Date.now() - 8 * 3600000).toISOString() },
+  { id: 's1', signalId: 'SIG-0001', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Beverages', productLabel: 'Soda 500ml', productId: 'BV-01', packageSize: 'small', priceTier: 'budget', quantity: 5, urgency: 'urgent', status: 'pending', isSynced: false, syncedAt: null, privacyApplied: false, notes: null, createdAt: new Date(Date.now() - 2 * 3600000).toISOString(), latitude: 0.3132, longitude: 32.6106, locationAccuracy: 15 },
+  { id: 's2', signalId: 'SIG-0002', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Groceries', productLabel: 'Cooking Oil 2L', productId: 'GR-05', packageSize: 'large', priceTier: 'mid-range', quantity: 3, urgency: 'urgent', status: 'pending', isSynced: false, syncedAt: null, privacyApplied: false, notes: null, createdAt: new Date(Date.now() - 2.5 * 3600000).toISOString(), latitude: 0.3132, longitude: 32.6106, locationAccuracy: 20 },
+  { id: 's3', signalId: 'SIG-0003', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Dairy', productLabel: 'Milk 1L', productId: 'DR-01', packageSize: 'medium', priceTier: 'budget', quantity: 10, urgency: 'normal', status: 'synced', isSynced: true, syncedAt: new Date(Date.now() - 3 * 3600000).toISOString(), privacyApplied: true, notes: null, createdAt: new Date(Date.now() - 4 * 3600000).toISOString(), latitude: 0.3132, longitude: 32.6106, locationAccuracy: 10 },
+  { id: 's4', signalId: 'SIG-0004', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Bakery', productLabel: 'Bread', productId: 'BK-01', packageSize: 'medium', priceTier: 'budget', quantity: 20, urgency: 'normal', status: 'assigned', isSynced: true, syncedAt: new Date(Date.now() - 4 * 3600000).toISOString(), privacyApplied: true, notes: null, createdAt: new Date(Date.now() - 5 * 3600000).toISOString(), latitude: 0.3140, longitude: 32.6115, locationAccuracy: 12 },
+  { id: 's5', signalId: 'SIG-0005', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Groceries', productLabel: 'Sugar 1kg', productId: 'GR-01', packageSize: 'medium', priceTier: 'budget', quantity: 8, urgency: 'low', status: 'in_transit', isSynced: true, syncedAt: new Date(Date.now() - 5 * 3600000).toISOString(), privacyApplied: true, notes: null, createdAt: new Date(Date.now() - 6 * 3600000).toISOString(), latitude: 0.3125, longitude: 32.6098, locationAccuracy: 18 },
+  { id: 's6', signalId: 'SIG-0006', shopkeeperId: 'SK-RETAIL-001', neighborhood: 'Bugolobi Market', productCategory: 'Cleaning', productLabel: 'Detergent 1kg', productId: 'CL-02', packageSize: 'medium', priceTier: 'mid-range', quantity: 4, urgency: 'normal', status: 'delivered', isSynced: true, syncedAt: new Date(Date.now() - 6 * 3600000).toISOString(), privacyApplied: true, notes: null, createdAt: new Date(Date.now() - 8 * 3600000).toISOString(), latitude: 0.3135, longitude: 32.6100, locationAccuracy: 8 },
 ];
 
 const DEMO_PROFILE: LocalRetailerProfile = {
@@ -126,6 +145,18 @@ function setItem<T>(key: string, value: T): void {
 export function seedLocalData(): { products: number; signals: number } {
   const alreadySeeded = localStorage.getItem(SEEDED_KEY);
   if (alreadySeeded) {
+    // Migrate old signals that don't have lat/lng fields
+    const signals = getItem<LocalDemandSignal[]>(SIGNALS_KEY, []);
+    const needsMigration = signals.some(s => s.latitude === undefined);
+    if (needsMigration) {
+      const migrated = signals.map(s => ({
+        ...s,
+        latitude: s.latitude ?? null,
+        longitude: s.longitude ?? null,
+        locationAccuracy: s.locationAccuracy ?? null,
+      }));
+      setItem(SIGNALS_KEY, migrated);
+    }
     return { products: DEMO_PRODUCTS.length, signals: DEMO_SIGNALS.length };
   }
   setItem(PRODUCTS_KEY, DEMO_PRODUCTS);
@@ -161,6 +192,9 @@ export function createLocalSignal(data: {
   urgency: string;
   neighborhood: string;
   notes?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  locationAccuracy?: number | null;
 }): LocalDemandSignal {
   const signals = getLocalSignals();
   const newSignal: LocalDemandSignal = {
@@ -181,12 +215,33 @@ export function createLocalSignal(data: {
     privacyApplied: false,
     notes: data.notes || null,
     createdAt: new Date().toISOString(),
+    latitude: data.latitude ?? null,
+    longitude: data.longitude ?? null,
+    locationAccuracy: data.locationAccuracy ?? null,
   };
   signals.unshift(newSignal);
   setItem(SIGNALS_KEY, signals);
   return newSignal;
 }
 
+export function markSignalSynced(signalId: string): void {
+  const signals = getLocalSignals();
+  const updated = signals.map(s => {
+    if (s.signalId === signalId && !s.isSynced) {
+      return {
+        ...s,
+        isSynced: true,
+        syncedAt: new Date().toISOString(),
+        privacyApplied: true,
+        status: 'synced' as string,
+      };
+    }
+    return s;
+  });
+  setItem(SIGNALS_KEY, updated);
+}
+
+// Fake local sync (for when no supplier API is configured)
 export function syncLocalSignals(): { synced: number } {
   const signals = getLocalSignals();
   let count = 0;
@@ -207,6 +262,80 @@ export function syncLocalSignals(): { synced: number } {
   return { synced: count };
 }
 
+// Real sync — POST unsynced signals to the supplier dashboard API
+export async function syncToSupplierApi(
+  connection: ConnectionSettings,
+  profile: LocalRetailerProfile
+): Promise<{ synced: number; failed: number; errors: string[] }> {
+  const signals = getLocalSignals();
+  const unsynced = signals.filter(s => !s.isSynced);
+
+  if (unsynced.length === 0) {
+    return { synced: 0, failed: 0, errors: [] };
+  }
+
+  if (!connection.supplierApiUrl) {
+    // No API configured — fall back to local-only sync
+    const result = syncLocalSignals();
+    return { synced: result.synced, failed: 0, errors: [] };
+  }
+
+  const baseUrl = connection.supplierApiUrl.replace(/\/+$/, '');
+  let synced = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const signal of unsynced) {
+    try {
+      const payload = {
+        signalId: signal.signalId,
+        shopkeeperId: signal.shopkeeperId,
+        businessName: profile.businessName,
+        neighborhood: signal.neighborhood,
+        productCategory: signal.productCategory,
+        productLabel: signal.productLabel,
+        productId: signal.productId,
+        packageSize: signal.packageSize,
+        priceTier: signal.priceTier,
+        quantity: signal.quantity,
+        urgency: signal.urgency,
+        notes: signal.notes,
+        latitude: signal.latitude,
+        longitude: signal.longitude,
+        locationAccuracy: signal.locationAccuracy,
+        createdAt: signal.createdAt,
+      };
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (connection.apiKey) {
+        headers['Authorization'] = `Bearer ${connection.apiKey}`;
+      }
+
+      const response = await fetch(`${baseUrl}/api/retailer-signals`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        markSignalSynced(signal.signalId);
+        synced++;
+      } else {
+        failed++;
+        const body = await response.text().catch(() => '');
+        errors.push(`Signal ${signal.signalId}: ${response.status} ${body}`);
+      }
+    } catch (err) {
+      failed++;
+      errors.push(`Signal ${signal.signalId}: ${err instanceof Error ? err.message : 'Network error'}`);
+    }
+  }
+
+  return { synced, failed, errors };
+}
+
 // ─── Profile ────────────────────────────────────────────────────────────────
 
 export function getLocalProfile(): LocalRetailerProfile {
@@ -220,10 +349,114 @@ export function updateLocalProfile(data: Partial<LocalRetailerProfile>): LocalRe
   return updated;
 }
 
+// ─── Connection Settings ────────────────────────────────────────────────────
+
+export function getConnectionSettings(): ConnectionSettings {
+  return getItem<ConnectionSettings>(CONNECTION_KEY, DEFAULT_CONNECTION);
+}
+
+export function updateConnectionSettings(data: Partial<ConnectionSettings>): ConnectionSettings {
+  const current = getConnectionSettings();
+  const updated = { ...current, ...data };
+  setItem(CONNECTION_KEY, updated);
+  return updated;
+}
+
+export function isSupplierConnected(): boolean {
+  const conn = getConnectionSettings();
+  return conn.supplierApiUrl.trim().length > 0;
+}
+
+// Test connection to the supplier dashboard
+export async function testSupplierConnection(url: string, apiKey?: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const baseUrl = url.replace(/\/+$/, '');
+    const headers: Record<string, string> = {};
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    const response = await fetch(`${baseUrl}/api/retailer-signals`, {
+      method: 'OPTIONS',
+      headers,
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (response.ok || response.status === 204) {
+      return { ok: true, message: 'Connected to supplier dashboard!' };
+    }
+    return { ok: false, message: `Server responded with ${response.status}` };
+  } catch (err) {
+    if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+      return { ok: false, message: 'Cannot reach server. Check the URL and network.' };
+    }
+    return { ok: false, message: err instanceof Error ? err.message : 'Connection failed' };
+  }
+}
+
 // ─── Native detection ───────────────────────────────────────────────────────
 
 export function isNativeApp(): boolean {
   if (typeof window === 'undefined') return false;
   // Capacitor sets this on native platforms
   return !!(window as unknown as { Capacitor?: unknown }).Capacitor;
+}
+
+// ─── Geolocation ────────────────────────────────────────────────────────────
+
+export async function getCurrentPosition(): Promise<{
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+} | null> {
+  try {
+    // Try Capacitor Geolocation first (native app)
+    if (isNativeApp()) {
+      try {
+        const { Geolocation } = await import('@capacitor/geolocation');
+        // Request permission
+        const permStatus = await Geolocation.checkPermissions();
+        if (permStatus.location === 'prompt' || permStatus.coarseLocation === 'prompt') {
+          await Geolocation.requestPermissions();
+        }
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+        });
+        return {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        };
+      } catch (capErr) {
+        console.warn('Capacitor Geolocation failed, falling back to browser API:', capErr);
+      }
+    }
+
+    // Fallback: browser Geolocation API
+    if (!navigator.geolocation) {
+      console.warn('Geolocation not available');
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          });
+        },
+        (error) => {
+          console.warn('Geolocation error:', error.message);
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    });
+  } catch (err) {
+    console.warn('Geolocation error:', err);
+    return null;
+  }
 }
