@@ -16,68 +16,32 @@ import {
   WifiOff,
   ChevronRight,
   X,
-  ArrowLeft,
   ShoppingBag,
-  BarChart3,
   MapPin,
   Phone,
   Mail,
   RefreshCw,
   TrendingUp,
-  Filter,
   Search,
 } from 'lucide-react';
+import {
+  seedLocalData,
+  getLocalProducts,
+  getLocalSignals,
+  createLocalSignal,
+  syncLocalSignals,
+  getLocalProfile,
+  isNativeApp,
+  type LocalProduct as Product,
+  type LocalDemandSignal as DemandSignal,
+  type LocalRetailerProfile as RetailerProfile,
+} from '@/lib/local-db';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface Product {
-  id: string;
-  productId: string;
-  productLabel: string;
-  brand: string | null;
-  category: string;
-  unit: string;
-  priceTier: string;
-  packageSize: string;
-  unitCost: number;
-  unitPrice: number;
-  currentStock: number;
-  minStock: number;
-  merchantName: string | null;
-  isActive: boolean;
-}
-
-interface DemandSignal {
-  id: string;
-  signalId: string;
-  shopkeeperId: string;
-  neighborhood: string;
-  productCategory: string;
-  productLabel: string;
-  productId: string;
-  packageSize: string;
-  priceTier: string;
-  quantity: number;
-  urgency: string;
-  status: string;
-  isSynced: boolean;
-  syncedAt: string | null;
-  notes: string | null;
-  createdAt: string;
-}
-
-interface RetailerProfile {
-  id: string;
-  shopkeeperId: string;
-  businessName: string;
-  contact: string;
-  email: string | null;
-  neighborhood: string;
-}
+// ─── Types (using local-db types) ───────────────────────────────────────────
 
 type TabId = 'inventory' | 'signals' | 'history' | 'profile';
 
-// ─── Category config ─────────────────────────────────────────────────────────
+// ─── Category config ────────────────────────────────────────────────────────
 
 const CATEGORIES = [
   { key: 'ALL', label: 'ALL' },
@@ -126,7 +90,7 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-// ─── Product placeholder image generator ─────────────────────────────────────
+// ─── Product placeholder image ──────────────────────────────────────────────
 
 function ProductImage({ product, className = '' }: { product: Product; className?: string }) {
   const icon = CATEGORY_ICONS[product.category] || '📦';
@@ -174,22 +138,17 @@ function InventoryScreen({
 
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Header */}
       <div className="px-4 pt-4 pb-2">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h1 className="text-xl font-bold text-gray-900 tracking-tight">Inventory</h1>
             <p className="text-xs text-gray-400 mt-0.5">{filtered.length} products</p>
           </div>
-          <button
-            onClick={() => setSearchQuery('')}
-            className="relative p-2"
-          >
+          <button onClick={() => setSearchQuery(searchQuery === '' ? ' ' : '')} className="relative p-2">
             <Search className="w-5 h-5 text-gray-600" />
           </button>
         </div>
 
-        {/* Search */}
         {searchQuery !== '' && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
@@ -200,33 +159,27 @@ function InventoryScreen({
             <div className="relative">
               <input
                 type="text"
-                value={searchQuery}
+                value={searchQuery.trimStart()}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search products..."
                 className="w-full pl-9 pr-8 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                 autoFocus
               />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-              >
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2">
                 <X className="w-4 h-4 text-gray-400" />
               </button>
             </div>
           </motion.div>
         )}
 
-        {/* Category Tabs */}
         <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
           {CATEGORIES.map((cat) => (
             <button
               key={cat.key}
               onClick={() => setActiveCategory(cat.key)}
               className={`shrink-0 px-3 py-1.5 text-[11px] font-semibold tracking-wider rounded-full transition-all duration-200 ${
-                activeCategory === cat.key
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                activeCategory === cat.key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
               }`}
             >
               {cat.label}
@@ -235,7 +188,6 @@ function InventoryScreen({
         </div>
       </div>
 
-      {/* Product Grid */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         <div className="grid grid-cols-3 gap-2.5">
           {filtered.map((product) => (
@@ -248,17 +200,12 @@ function InventoryScreen({
             >
               <ProductImage product={product} className="aspect-square w-full" />
               <div className="p-2 text-left">
-                <p className="font-mono text-[10px] text-gray-400 leading-none mb-0.5">
-                  {product.productId}
-                </p>
-                <p className="text-[11px] font-medium text-gray-900 leading-tight line-clamp-2">
-                  {product.productLabel}
-                </p>
+                <p className="font-mono text-[10px] text-gray-400 leading-none mb-0.5">{product.productId}</p>
+                <p className="text-[11px] font-medium text-gray-900 leading-tight line-clamp-2">{product.productLabel}</p>
               </div>
             </motion.button>
           ))}
         </div>
-
         {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16">
             <Package className="w-12 h-12 text-gray-300 mb-3" />
@@ -303,12 +250,10 @@ function SignalModal({
         className="w-full max-w-lg bg-white rounded-t-3xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-gray-200 rounded-full" />
         </div>
 
-        {/* Product Info */}
         <div className="px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center">
@@ -317,44 +262,29 @@ function SignalModal({
             <div className="flex-1 min-w-0">
               <p className="font-mono text-xs text-gray-400">{product.productId}</p>
               <h3 className="text-lg font-bold text-gray-900 truncate">{product.productLabel}</h3>
-              <p className="text-xs text-gray-400">
-                {product.category} · {product.unit} · USh {product.unitPrice.toLocaleString()}
-              </p>
+              <p className="text-xs text-gray-400">{product.category} · {product.unit} · USh {product.unitPrice.toLocaleString()}</p>
             </div>
           </div>
         </div>
 
-        {/* Form */}
         <div className="px-6 py-5 space-y-5">
-          {/* Quantity */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
-              Quantity
-            </label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Quantity</label>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-11 h-11 rounded-xl border border-gray-200 flex items-center justify-center active:bg-gray-100 transition-colors"
-              >
+              <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-11 h-11 rounded-xl border border-gray-200 flex items-center justify-center active:bg-gray-100 transition-colors">
                 <Minus className="w-4 h-4 text-gray-600" />
               </button>
               <div className="flex-1 text-center">
                 <span className="text-3xl font-bold text-gray-900">{quantity}</span>
               </div>
-              <button
-                onClick={() => setQuantity(quantity + 1)}
-                className="w-11 h-11 rounded-xl border border-gray-200 flex items-center justify-center active:bg-gray-100 transition-colors"
-              >
+              <button onClick={() => setQuantity(quantity + 1)} className="w-11 h-11 rounded-xl border border-gray-200 flex items-center justify-center active:bg-gray-100 transition-colors">
                 <Plus className="w-4 h-4 text-gray-600" />
               </button>
             </div>
           </div>
 
-          {/* Urgency */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
-              Urgency Level
-            </label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Urgency Level</label>
             <div className="grid grid-cols-3 gap-2">
               {[
                 { key: 'urgent', label: 'Urgent', icon: AlertTriangle, color: 'border-red-200 bg-red-50 text-red-700' },
@@ -364,15 +294,7 @@ function SignalModal({
                 const Icon = opt.icon;
                 const isActive = urgency === opt.key;
                 return (
-                  <button
-                    key={opt.key}
-                    onClick={() => setUrgency(opt.key)}
-                    className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-all duration-200 ${
-                      isActive
-                        ? opt.color
-                        : 'border-gray-100 bg-white text-gray-400'
-                    }`}
-                  >
+                  <button key={opt.key} onClick={() => setUrgency(opt.key)} className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-all duration-200 ${isActive ? opt.color : 'border-gray-100 bg-white text-gray-400'}`}>
                     <Icon className="w-5 h-5" />
                     <span className="text-xs font-semibold">{opt.label}</span>
                   </button>
@@ -381,39 +303,16 @@ function SignalModal({
             </div>
           </div>
 
-          {/* Notes */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
-              Notes (optional)
-            </label>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g., Need before Friday"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-            />
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Notes (optional)</label>
+            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g., Need before Friday" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
           </div>
         </div>
 
-        {/* Actions */}
         <div className="px-6 pb-8 pt-2 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm active:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onSubmit({ quantity, urgency, notes })}
-            disabled={isSubmitting}
-            className="flex-1 py-3.5 rounded-xl bg-gray-900 text-white font-semibold text-sm active:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isSubmitting ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <Radio className="w-4 h-4" />
-            )}
+          <button onClick={onClose} className="flex-1 py-3.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm active:bg-gray-50 transition-colors">Cancel</button>
+          <button onClick={() => onSubmit({ quantity, urgency, notes })} disabled={isSubmitting} className="flex-1 py-3.5 rounded-xl bg-gray-900 text-white font-semibold text-sm active:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Radio className="w-4 h-4" />}
             Send Signal
           </button>
         </div>
@@ -442,50 +341,31 @@ function SignalsScreen({
 
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Header */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">Demand Signals</h1>
-          <button
-            onClick={onSync}
-            disabled={isSyncing || unsynced.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-full disabled:opacity-40 active:bg-gray-800 transition-colors"
-          >
-            {isSyncing ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Upload className="w-3.5 h-3.5" />
-            )}
+          <button onClick={onSync} disabled={isSyncing || unsynced.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-full disabled:opacity-40 active:bg-gray-800 transition-colors">
+            {isSyncing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
             Sync {unsynced.length > 0 && `(${unsynced.length})`}
           </button>
         </div>
         <p className="text-xs text-gray-400">Tap products below to create demand signals</p>
       </div>
 
-      {/* Quick signal grid */}
       <div className="px-4 pb-3">
         <div className="bg-gray-50 rounded-2xl p-3">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Quick Signal
-          </p>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Quick Signal</p>
           <div className="grid grid-cols-4 gap-2">
             {products.slice(0, 8).map((product) => (
-              <button
-                key={product.id}
-                onClick={() => onCreateSignal(product)}
-                className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white border border-gray-100 active:scale-95 transition-transform"
-              >
+              <button key={product.id} onClick={() => onCreateSignal(product)} className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white border border-gray-100 active:scale-95 transition-transform">
                 <span className="text-lg">{CATEGORY_ICONS[product.category] || '📦'}</span>
-                <span className="text-[9px] font-medium text-gray-600 truncate w-full text-center">
-                  {product.productLabel.split(' ')[0]}
-                </span>
+                <span className="text-[9px] font-medium text-gray-600 truncate w-full text-center">{product.productLabel.split(' ')[0]}</span>
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Active Signals */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         {activeSignals.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
@@ -496,52 +376,25 @@ function SignalsScreen({
         ) : (
           <div className="space-y-2">
             {activeSignals.map((signal) => (
-              <div
-                key={signal.id}
-                className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-2xl"
-              >
+              <div key={signal.id} className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-2xl">
                 <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shrink-0">
-                  <span className="text-lg">
-                    {CATEGORY_ICONS[signal.productCategory] || '📦'}
-                  </span>
+                  <span className="text-lg">{CATEGORY_ICONS[signal.productCategory] || '📦'}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-semibold text-gray-900 truncate">
-                      {signal.productLabel}
-                    </p>
-                    {!signal.isSynced && (
-                      <WifiOff className="w-3 h-3 text-amber-500 shrink-0" />
-                    )}
-                    {signal.isSynced && (
-                      <Wifi className="w-3 h-3 text-green-500 shrink-0" />
-                    )}
+                    <p className="text-sm font-semibold text-gray-900 truncate">{signal.productLabel}</p>
+                    {!signal.isSynced && <WifiOff className="w-3 h-3 text-amber-500 shrink-0" />}
+                    {signal.isSynced && <Wifi className="w-3 h-3 text-green-500 shrink-0" />}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-gray-400">
-                      {signal.signalId}
-                    </span>
+                    <span className="font-mono text-[10px] text-gray-400">{signal.signalId}</span>
                     <span className="text-[10px] text-gray-300">·</span>
-                    <span className="text-[10px] text-gray-400">
-                      Qty: {signal.quantity}
-                    </span>
+                    <span className="text-[10px] text-gray-400">Qty: {signal.quantity}</span>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                      URGENCY_COLORS[signal.urgency]
-                    }`}
-                  >
-                    {signal.urgency}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                      STATUS_COLORS[signal.status]
-                    }`}
-                  >
-                    {STATUS_LABELS[signal.status]}
-                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${URGENCY_COLORS[signal.urgency]}`}>{signal.urgency}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_COLORS[signal.status]}`}>{STATUS_LABELS[signal.status]}</span>
                 </div>
               </div>
             ))}
@@ -572,31 +425,14 @@ function HistoryScreen({ signals }: { signals: DemandSignal[] }) {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Header */}
       <div className="px-4 pt-4 pb-2">
         <h1 className="text-xl font-bold text-gray-900 tracking-tight mb-3">Signal History</h1>
-
-        {/* Stats */}
         <div className="grid grid-cols-4 gap-2 mb-3">
-          <div className="bg-gray-50 rounded-xl p-2.5 text-center">
-            <p className="text-lg font-bold text-gray-900">{totalSignals}</p>
-            <p className="text-[9px] text-gray-400 font-semibold uppercase">Total</p>
-          </div>
-          <div className="bg-amber-50 rounded-xl p-2.5 text-center">
-            <p className="text-lg font-bold text-amber-700">{pendingCount}</p>
-            <p className="text-[9px] text-amber-500 font-semibold uppercase">Pending</p>
-          </div>
-          <div className="bg-blue-50 rounded-xl p-2.5 text-center">
-            <p className="text-lg font-bold text-blue-700">{activeCount}</p>
-            <p className="text-[9px] text-blue-500 font-semibold uppercase">Active</p>
-          </div>
-          <div className="bg-green-50 rounded-xl p-2.5 text-center">
-            <p className="text-lg font-bold text-green-700">{deliveredCount}</p>
-            <p className="text-[9px] text-green-500 font-semibold uppercase">Done</p>
-          </div>
+          <div className="bg-gray-50 rounded-xl p-2.5 text-center"><p className="text-lg font-bold text-gray-900">{totalSignals}</p><p className="text-[9px] text-gray-400 font-semibold uppercase">Total</p></div>
+          <div className="bg-amber-50 rounded-xl p-2.5 text-center"><p className="text-lg font-bold text-amber-700">{pendingCount}</p><p className="text-[9px] text-amber-500 font-semibold uppercase">Pending</p></div>
+          <div className="bg-blue-50 rounded-xl p-2.5 text-center"><p className="text-lg font-bold text-blue-700">{activeCount}</p><p className="text-[9px] text-blue-500 font-semibold uppercase">Active</p></div>
+          <div className="bg-green-50 rounded-xl p-2.5 text-center"><p className="text-lg font-bold text-green-700">{deliveredCount}</p><p className="text-[9px] text-green-500 font-semibold uppercase">Done</p></div>
         </div>
-
-        {/* Filter tabs */}
         <div className="flex gap-1 mb-2">
           {[
             { key: 'all', label: 'All' },
@@ -604,22 +440,13 @@ function HistoryScreen({ signals }: { signals: DemandSignal[] }) {
             { key: 'active', label: 'Active' },
             { key: 'completed', label: 'Done' },
           ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 text-[11px] font-semibold rounded-full transition-all ${
-                filter === f.key
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-500'
-              }`}
-            >
+            <button key={f.key} onClick={() => setFilter(f.key)} className={`px-3 py-1.5 text-[11px] font-semibold rounded-full transition-all ${filter === f.key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'}`}>
               {f.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* History list */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
@@ -632,42 +459,22 @@ function HistoryScreen({ signals }: { signals: DemandSignal[] }) {
               const date = new Date(signal.createdAt);
               const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-
               return (
-                <div
-                  key={signal.id}
-                  className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-2xl"
-                >
+                <div key={signal.id} className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-2xl">
                   <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shrink-0">
-                    <span className="text-lg">
-                      {CATEGORY_ICONS[signal.productCategory] || '📦'}
-                    </span>
+                    <span className="text-lg">{CATEGORY_ICONS[signal.productCategory] || '📦'}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">
-                      {signal.productLabel}
-                    </p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{signal.productLabel}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="font-mono text-[10px] text-gray-400">
-                        {signal.signalId}
-                      </span>
+                      <span className="font-mono text-[10px] text-gray-400">{signal.signalId}</span>
                       <span className="text-[10px] text-gray-300">·</span>
-                      <span className="text-[10px] text-gray-400">
-                        Qty {signal.quantity} · {signal.urgency}
-                      </span>
+                      <span className="text-[10px] text-gray-400">Qty {signal.quantity} · {signal.urgency}</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                        STATUS_COLORS[signal.status]
-                      }`}
-                    >
-                      {STATUS_LABELS[signal.status]}
-                    </span>
-                    <span className="text-[9px] text-gray-300">
-                      {dateStr} {timeStr}
-                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_COLORS[signal.status]}`}>{STATUS_LABELS[signal.status]}</span>
+                    <span className="text-[9px] text-gray-300">{dateStr} {timeStr}</span>
                   </div>
                 </div>
               );
@@ -688,6 +495,7 @@ function ProfileScreen({
   isOnline,
   onSync,
   isSyncing,
+  nativeMode,
 }: {
   profile: RetailerProfile | null;
   unsyncedCount: number;
@@ -695,67 +503,40 @@ function ProfileScreen({
   isOnline: boolean;
   onSync: () => void;
   isSyncing: boolean;
+  nativeMode: boolean;
 }) {
   return (
     <div className="flex flex-col h-full bg-white">
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4">
-        {/* Profile Header */}
         <div className="flex items-center gap-4 mb-6">
           <div className="w-16 h-16 bg-gradient-to-br from-[#FF6B35] to-[#E55A2B] rounded-2xl flex items-center justify-center">
-            <span className="text-2xl font-bold text-white">
-              {profile?.businessName?.charAt(0) || 'S'}
-            </span>
+            <span className="text-2xl font-bold text-white">{profile?.businessName?.charAt(0) || 'S'}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold text-gray-900 truncate">
-              {profile?.businessName || 'Shop'}
-            </h2>
-            <p className="text-xs text-gray-400 font-mono">
-              {profile?.shopkeeperId || 'SK-RETAIL-001'}
-            </p>
+            <h2 className="text-lg font-bold text-gray-900 truncate">{profile?.businessName || 'Shop'}</h2>
+            <p className="text-xs text-gray-400 font-mono">{profile?.shopkeeperId || 'SK-RETAIL-001'}</p>
+            {nativeMode && (
+              <span className="inline-block px-2 py-0.5 mt-1 text-[9px] bg-[#FF6B35]/10 text-[#FF6B35] rounded-full font-semibold">NATIVE APP</span>
+            )}
           </div>
         </div>
 
-        {/* Connection Status */}
-        <div
-          className={`flex items-center gap-3 p-4 rounded-2xl mb-4 ${
-            isOnline ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'
-          }`}
-        >
-          {isOnline ? (
-            <Wifi className="w-5 h-5 text-green-600" />
-          ) : (
-            <WifiOff className="w-5 h-5 text-red-600" />
-          )}
+        <div className={`flex items-center gap-3 p-4 rounded-2xl mb-4 ${isOnline ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
+          {isOnline ? <Wifi className="w-5 h-5 text-green-600" /> : <WifiOff className="w-5 h-5 text-red-600" />}
           <div className="flex-1">
-            <p className={`text-sm font-semibold ${isOnline ? 'text-green-700' : 'text-red-700'}`}>
-              {isOnline ? 'Online' : 'Offline'}
-            </p>
-            <p className="text-xs text-gray-500">
-              {isOnline
-                ? 'Signals will be synced automatically'
-                : 'Signals saved locally until connection restored'}
-            </p>
+            <p className={`text-sm font-semibold ${isOnline ? 'text-green-700' : 'text-red-700'}`}>{isOnline ? 'Online' : 'Offline'}</p>
+            <p className="text-xs text-gray-500">{isOnline ? 'Signals will be synced automatically' : 'Signals saved locally until connection restored'}</p>
           </div>
         </div>
 
-        {/* Sync Status */}
         <div className="bg-gray-50 rounded-2xl p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Upload className="w-4 h-4 text-gray-500" />
               <span className="text-sm font-semibold text-gray-700">Sync Status</span>
             </div>
-            <button
-              onClick={onSync}
-              disabled={isSyncing || unsyncedCount === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-full disabled:opacity-40 active:bg-gray-800 transition-colors"
-            >
-              {isSyncing ? (
-                <RefreshCw className="w-3 h-3 animate-spin" />
-              ) : (
-                <RefreshCw className="w-3 h-3" />
-              )}
+            <button onClick={onSync} disabled={isSyncing || unsyncedCount === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-full disabled:opacity-40 active:bg-gray-800 transition-colors">
+              {isSyncing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
               Sync Now
             </button>
           </div>
@@ -771,11 +552,8 @@ function ProfileScreen({
           </div>
         </div>
 
-        {/* Shop Details */}
         <div className="space-y-1">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">
-            Shop Details
-          </p>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Shop Details</p>
           {[
             { icon: MapPin, label: 'Neighborhood', value: profile?.neighborhood || 'Bugolobi Market' },
             { icon: Phone, label: 'Contact', value: profile?.contact || '+256 770 123456' },
@@ -784,10 +562,7 @@ function ProfileScreen({
           ].map((item) => {
             const Icon = item.icon;
             return (
-              <div
-                key={item.label}
-                className="flex items-center gap-3 px-3 py-3 bg-white border border-gray-100 rounded-xl"
-              >
+              <div key={item.label} className="flex items-center gap-3 px-3 py-3 bg-white border border-gray-100 rounded-xl">
                 <Icon className="w-4 h-4 text-gray-400" />
                 <div className="flex-1">
                   <p className="text-[10px] text-gray-400 font-medium uppercase">{item.label}</p>
@@ -799,7 +574,6 @@ function ProfileScreen({
           })}
         </div>
 
-        {/* About */}
         <div className="mt-6 text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
             <div className="w-6 h-6 bg-[#FF6B35] rounded-lg flex items-center justify-center">
@@ -808,7 +582,7 @@ function ProfileScreen({
             <span className="text-sm font-bold text-gray-900">DDL Platform</span>
           </div>
           <p className="text-[10px] text-gray-400">Direct Demand-to-Logistics v1.0</p>
-          <p className="text-[10px] text-gray-300">Bugolobi, Kampala · Retailer App</p>
+          <p className="text-[10px] text-gray-300">Bugolobi, Kampala · {nativeMode ? 'Native App' : 'Retailer App'}</p>
         </div>
       </div>
     </div>
@@ -826,53 +600,68 @@ export default function Home() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-  const [isSeeded, setIsSeeded] = useState(false);
+  const [nativeMode, setNativeMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Seed data on first load
+  // Initialize data
   useEffect(() => {
-    async function seedData() {
+    async function initData() {
       try {
-        const res = await fetch('/api/seed', { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-          setIsSeeded(true);
+        // Seed local data first
+        seedLocalData();
+
+        // Check if running as native app
+        const native = isNativeApp();
+        setNativeMode(native);
+
+        if (native) {
+          // Native mode: use localStorage
+          setProducts(getLocalProducts());
+          setSignals(getLocalSignals());
+          setProfile(getLocalProfile());
+        } else {
+          // Web mode: try API first, fall back to localStorage
+          try {
+            // Seed server DB
+            await fetch('/api/seed', { method: 'POST' });
+
+            const [productsRes, signalsRes, profileRes] = await Promise.all([
+              fetch('/api/products'),
+              fetch('/api/signals'),
+              fetch('/api/profile'),
+            ]);
+
+            const productsData = await productsRes.json();
+            const signalsData = await signalsRes.json();
+            const profileData = await profileRes.json();
+
+            if (productsData.success) setProducts(productsData.data);
+            else setProducts(getLocalProducts());
+
+            if (signalsData.success) setSignals(signalsData.data);
+            else setSignals(getLocalSignals());
+
+            if (profileData.success) setProfile(profileData.data);
+            else setProfile(getLocalProfile());
+          } catch {
+            // API not available (static export) — use localStorage
+            setProducts(getLocalProducts());
+            setSignals(getLocalSignals());
+            setProfile(getLocalProfile());
+          }
         }
       } catch (err) {
-        console.error('Seed error:', err);
-        setIsSeeded(true); // may already be seeded
-      }
-    }
-    seedData();
-  }, []);
-
-  // Fetch data after seeding
-  useEffect(() => {
-    if (!isSeeded) return;
-
-    async function fetchData() {
-      try {
-        const [productsRes, signalsRes, profileRes] = await Promise.all([
-          fetch('/api/products'),
-          fetch('/api/signals'),
-          fetch('/api/profile'),
-        ]);
-
-        const productsData = await productsRes.json();
-        const signalsData = await signalsRes.json();
-        const profileData = await profileRes.json();
-
-        if (productsData.success) setProducts(productsData.data);
-        if (signalsData.success) setSignals(signalsData.data);
-        if (profileData.success) setProfile(profileData.data);
-      } catch (err) {
-        console.error('Fetch error:', err);
+        console.error('Init error:', err);
+        // Ultimate fallback
+        setProducts(getLocalProducts());
+        setSignals(getLocalSignals());
+        setProfile(getLocalProfile());
       } finally {
         setIsLoading(false);
       }
     }
-    fetchData();
-  }, [isSeeded]);
+    initData();
+  }, []);
 
   // Monitor online status
   useEffect(() => {
@@ -893,57 +682,81 @@ export default function Home() {
       if (!selectedProduct) return;
       setIsSubmitting(true);
       try {
-        const res = await fetch('/api/signals', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            productLabel: selectedProduct.productLabel,
-            productId: selectedProduct.productId,
-            productCategory: selectedProduct.category,
-            packageSize: selectedProduct.packageSize,
-            priceTier: selectedProduct.priceTier,
-            quantity: data.quantity,
-            urgency: data.urgency,
-            neighborhood: profile?.neighborhood || 'Bugolobi Market',
-            notes: data.notes,
-          }),
+        // Always save to localStorage first (instant, works offline)
+        const newSignal = createLocalSignal({
+          productLabel: selectedProduct.productLabel,
+          productId: selectedProduct.productId,
+          productCategory: selectedProduct.category,
+          packageSize: selectedProduct.packageSize,
+          priceTier: selectedProduct.priceTier,
+          quantity: data.quantity,
+          urgency: data.urgency,
+          neighborhood: profile?.neighborhood || 'Bugolobi Market',
+          notes: data.notes,
         });
-        const result = await res.json();
-        if (result.success) {
-          setSignals((prev) => [result.data, ...prev]);
-          setSelectedProduct(null);
+        setSignals((prev) => [newSignal, ...prev]);
+
+        // Also try API if in web mode
+        if (!nativeMode) {
+          try {
+            await fetch('/api/signals', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                productLabel: selectedProduct.productLabel,
+                productId: selectedProduct.productId,
+                productCategory: selectedProduct.category,
+                packageSize: selectedProduct.packageSize,
+                priceTier: selectedProduct.priceTier,
+                quantity: data.quantity,
+                urgency: data.urgency,
+                neighborhood: profile?.neighborhood || 'Bugolobi Market',
+                notes: data.notes,
+              }),
+            });
+          } catch {
+            // API unavailable, localStorage already has it
+          }
         }
+
+        setSelectedProduct(null);
       } catch (err) {
         console.error('Signal create error:', err);
       } finally {
         setIsSubmitting(false);
       }
     },
-    [selectedProduct, profile]
+    [selectedProduct, profile, nativeMode]
   );
 
   // Sync signals
   const handleSync = useCallback(async () => {
     setIsSyncing(true);
     try {
-      const res = await fetch('/api/sync', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        // Refresh signals
-        const signalsRes = await fetch('/api/signals');
-        const signalsData = await signalsRes.json();
-        if (signalsData.success) setSignals(signalsData.data);
+      // Sync local storage
+      const result = syncLocalSignals();
+      setSignals(getLocalSignals());
+
+      // Also try API sync
+      if (!nativeMode) {
+        try {
+          await fetch('/api/sync', { method: 'POST' });
+          const signalsRes = await fetch('/api/signals');
+          const signalsData = await signalsRes.json();
+          if (signalsData.success) setSignals(signalsData.data);
+        } catch {
+          // API unavailable, local sync already done
+        }
       }
     } catch (err) {
       console.error('Sync error:', err);
     } finally {
       setIsSyncing(false);
     }
-  }, []);
+  }, [nativeMode]);
 
   const unsyncedCount = signals.filter((s) => !s.isSynced).length;
 
-  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -966,7 +779,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white max-w-lg mx-auto">
-      {/* Content Area */}
       <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
@@ -977,37 +789,14 @@ export default function Home() {
             transition={{ duration: 0.15 }}
             className="h-full"
           >
-            {activeTab === 'inventory' && (
-              <InventoryScreen
-                products={products}
-                onSelectProduct={setSelectedProduct}
-              />
-            )}
-            {activeTab === 'signals' && (
-              <SignalsScreen
-                signals={signals}
-                products={products}
-                onCreateSignal={setSelectedProduct}
-                onSync={handleSync}
-                isSyncing={isSyncing}
-              />
-            )}
+            {activeTab === 'inventory' && <InventoryScreen products={products} onSelectProduct={setSelectedProduct} />}
+            {activeTab === 'signals' && <SignalsScreen signals={signals} products={products} onCreateSignal={setSelectedProduct} onSync={handleSync} isSyncing={isSyncing} />}
             {activeTab === 'history' && <HistoryScreen signals={signals} />}
-            {activeTab === 'profile' && (
-              <ProfileScreen
-                profile={profile}
-                unsyncedCount={unsyncedCount}
-                totalSignals={signals.length}
-                isOnline={isOnline}
-                onSync={handleSync}
-                isSyncing={isSyncing}
-              />
-            )}
+            {activeTab === 'profile' && <ProfileScreen profile={profile} unsyncedCount={unsyncedCount} totalSignals={signals.length} isOnline={isOnline} onSync={handleSync} isSyncing={isSyncing} nativeMode={nativeMode} />}
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* Offline Banner */}
       {!isOnline && (
         <div className="bg-amber-500 text-white text-center py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5">
           <WifiOff className="w-3.5 h-3.5" />
@@ -1015,63 +804,29 @@ export default function Home() {
         </div>
       )}
 
-      {/* Bottom Navigation */}
       <nav className="bg-white border-t border-gray-100 pb-safe">
         <div className="flex items-center justify-around px-2 pt-1 pb-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
             return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`relative flex flex-col items-center gap-0.5 py-2 px-3 rounded-xl transition-all duration-200 ${
-                  isActive ? 'text-gray-900' : 'text-gray-400'
-                }`}
-              >
+              <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`relative flex flex-col items-center gap-0.5 py-2 px-3 rounded-xl transition-all duration-200 ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
                 <div className="relative">
-                  <Icon
-                    className={`w-5 h-5 transition-all duration-200 ${
-                      isActive ? 'text-gray-900' : 'text-gray-400'
-                    }`}
-                    strokeWidth={isActive ? 2.5 : 1.5}
-                  />
+                  <Icon className={`w-5 h-5 transition-all duration-200 ${isActive ? 'text-gray-900' : 'text-gray-400'}`} strokeWidth={isActive ? 2.5 : 1.5} />
                   {tab.badge && tab.badge > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#FF6B35] text-white text-[8px] font-bold rounded-full flex items-center justify-center">
-                      {tab.badge}
-                    </span>
+                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#FF6B35] text-white text-[8px] font-bold rounded-full flex items-center justify-center">{tab.badge}</span>
                   )}
                 </div>
-                <span
-                  className={`text-[10px] font-semibold ${
-                    isActive ? 'text-gray-900' : 'text-gray-400'
-                  }`}
-                >
-                  {tab.label}
-                </span>
-                {isActive && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute -bottom-1 w-5 h-0.5 bg-gray-900 rounded-full"
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                  />
-                )}
+                <span className={`text-[10px] font-semibold ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>{tab.label}</span>
+                {isActive && <motion.div layoutId="activeTab" className="absolute -bottom-1 w-5 h-0.5 bg-gray-900 rounded-full" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />}
               </button>
             );
           })}
         </div>
       </nav>
 
-      {/* Signal Creation Modal */}
       <AnimatePresence>
-        {selectedProduct && (
-          <SignalModal
-            product={selectedProduct}
-            onClose={() => setSelectedProduct(null)}
-            onSubmit={handleCreateSignal}
-            isSubmitting={isSubmitting}
-          />
-        )}
+        {selectedProduct && <SignalModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onSubmit={handleCreateSignal} isSubmitting={isSubmitting} />}
       </AnimatePresence>
     </div>
   );

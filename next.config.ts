@@ -1,12 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
-  /* config options here */
+  output: "export",
   typescript: {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // For Capacitor: static export needs trailing slashes
+  trailingSlash: true,
+  // Disable image optimization for static export
+  images: {
+    unoptimized: true,
+  },
 };
 
 export default nextConfig;
