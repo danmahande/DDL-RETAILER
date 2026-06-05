@@ -414,14 +414,28 @@ export async function getCurrentPosition(): Promise<{
     if (isNativeApp()) {
       try {
         const { Geolocation } = await import('@capacitor/geolocation');
-        // Request permission
-        const permStatus = await Geolocation.checkPermissions();
-        if (permStatus.location === 'prompt' || permStatus.coarseLocation === 'prompt') {
-          await Geolocation.requestPermissions();
+
+        // Request permission — handle all states
+        try {
+          const permStatus = await Geolocation.checkPermissions();
+          if (permStatus.location === 'prompt' || permStatus.coarseLocation === 'prompt') {
+            const reqResult = await Geolocation.requestPermissions();
+            if (reqResult.location === 'denied' && reqResult.coarseLocation === 'denied') {
+              console.warn('Location permission denied by user');
+              return null;
+            }
+          } else if (permStatus.location === 'denied' && permStatus.coarseLocation === 'denied') {
+            console.warn('Location permission denied — enable in phone Settings > Apps > DDL Retailer > Permissions');
+            return null;
+          }
+        } catch (permErr) {
+          console.warn('Permission check failed, trying position anyway:', permErr);
         }
+
+        // Get position with extended timeout for first-time GPS lock
         const position = await Geolocation.getCurrentPosition({
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 15000,
         });
         return {
           latitude: position.coords.latitude,
@@ -430,12 +444,13 @@ export async function getCurrentPosition(): Promise<{
         };
       } catch (capErr) {
         console.warn('Capacitor Geolocation failed, falling back to browser API:', capErr);
+        // Don't return null — fall through to browser API
       }
     }
 
-    // Fallback: browser Geolocation API
+    // Fallback: browser Geolocation API (works in both native WebView and browser)
     if (!navigator.geolocation) {
-      console.warn('Geolocation not available');
+      console.warn('Geolocation not available in this browser/WebView');
       return null;
     }
 
@@ -449,14 +464,14 @@ export async function getCurrentPosition(): Promise<{
           });
         },
         (error) => {
-          console.warn('Geolocation error:', error.message);
+          console.warn('Geolocation error:', error.code, error.message);
           resolve(null);
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
       );
     });
   } catch (err) {
-    console.warn('Geolocation error:', err);
+    console.warn('Geolocation unexpected error:', err);
     return null;
   }
 }

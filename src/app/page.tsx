@@ -250,10 +250,12 @@ function SignalModal({
   const [urgency, setUrgency] = useState('normal');
   const [notes, setNotes] = useState('');
   const [gpsStatus, setGpsStatus] = useState<'capturing' | 'captured' | 'unavailable'>('capturing');
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
 
   // Capture GPS on modal open
-  useEffect(() => {
+  const captureGps = useCallback(() => {
+    setGpsStatus('capturing');
+    setGpsCoords(null);
     let cancelled = false;
     async function getGps() {
       try {
@@ -261,7 +263,7 @@ function SignalModal({
         if (cancelled) return;
         if (pos) {
           setGpsStatus('captured');
-          setGpsCoords({ lat: pos.latitude, lng: pos.longitude });
+          setGpsCoords({ lat: pos.latitude, lng: pos.longitude, accuracy: pos.accuracy });
         } else {
           setGpsStatus('unavailable');
         }
@@ -272,6 +274,11 @@ function SignalModal({
     getGps();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    const cleanup = captureGps();
+    return cleanup;
+  }, [captureGps]);
 
   return (
     <motion.div
@@ -348,36 +355,46 @@ function SignalModal({
           </div>
 
           {/* GPS Status Indicator */}
-          <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${
+          <div className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl border ${
             gpsStatus === 'captured' ? 'bg-green-50 border-green-200' :
             gpsStatus === 'unavailable' ? 'bg-amber-50 border-amber-200' :
             'bg-gray-50 border-gray-200'
           }`}>
             {gpsStatus === 'capturing' && (
               <>
-                <RefreshCw className="w-4 h-4 text-gray-500 animate-spin" />
+                <RefreshCw className="w-4 h-4 text-gray-500 animate-spin shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs font-semibold text-gray-700">Getting your location...</p>
-                  <p className="text-[10px] text-gray-400">GPS coordinates will be attached to this signal</p>
+                  <p className="text-[10px] text-gray-400">Make sure GPS/Location is turned ON in phone settings</p>
                 </div>
               </>
             )}
             {gpsStatus === 'captured' && gpsCoords && (
               <>
-                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                <div>
+                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
                   <p className="text-xs font-semibold text-green-700">Location captured</p>
                   <p className="text-[10px] text-green-500 font-mono">{gpsCoords.lat.toFixed(4)}, {gpsCoords.lng.toFixed(4)}</p>
+                  {gpsCoords.accuracy && (
+                    <p className="text-[9px] text-green-400 mt-0.5">Accuracy: ~{Math.round(gpsCoords.accuracy)}m</p>
+                  )}
                 </div>
+                <Crosshair className="w-3.5 h-3.5 text-green-400 shrink-0" />
               </>
             )}
             {gpsStatus === 'unavailable' && (
               <>
-                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
-                <div>
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <div className="flex-1">
                   <p className="text-xs font-semibold text-amber-700">Location unavailable</p>
-                  <p className="text-[10px] text-amber-500">Signal will be sent without GPS coordinates</p>
+                  <p className="text-[10px] text-amber-500">Turn ON phone GPS, then tap Retry</p>
                 </div>
+                <button
+                  onClick={captureGps}
+                  className="shrink-0 px-2.5 py-1 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-lg active:bg-amber-200 transition-colors"
+                >
+                  Retry
+                </button>
               </>
             )}
           </div>
