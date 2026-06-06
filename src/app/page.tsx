@@ -32,6 +32,11 @@ import {
   EyeOff,
   Save,
   Zap,
+  Trash2,
+  Ban,
+  LogOut,
+  Lock,
+  ImageOff,
 } from 'lucide-react';
 import {
   seedLocalData,
@@ -47,6 +52,12 @@ import {
   isNativeApp,
   getCurrentPosition,
   testSupplierConnection,
+  deleteLocalSignal,
+  cancelLocalSignal,
+  getLoginPin,
+  setLoginPin,
+  verifyLoginPin,
+  hasLoginPin,
   type LocalProduct as Product,
   type LocalDemandSignal as DemandSignal,
   type LocalRetailerProfile as RetailerProfile,
@@ -106,16 +117,27 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-// ─── Product placeholder image ──────────────────────────────────────────────
+// ─── Product image with real photos ─────────────────────────────────────────
 
 function ProductImage({ product, className = '' }: { product: Product; className?: string }) {
+  const [imgError, setImgError] = useState(false);
   const icon = CATEGORY_ICONS[product.category] || '📦';
   const isLow = product.currentStock <= product.minStock;
   const isCritical = product.currentStock <= product.minStock * 0.3;
 
   return (
     <div className={`relative bg-gray-50 flex items-center justify-center overflow-hidden ${className}`}>
-      <span className="text-3xl select-none">{icon}</span>
+      {product.imageUrl && !imgError ? (
+        <img
+          src={product.imageUrl}
+          alt={product.productLabel}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+          loading="lazy"
+        />
+      ) : (
+        <span className="text-3xl select-none">{icon}</span>
+      )}
       {isCritical && (
         <div className="absolute top-1.5 right-1.5">
           <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
@@ -126,6 +148,139 @@ function ProductImage({ product, className = '' }: { product: Product; className
           <div className="w-2 h-2 rounded-full bg-amber-400" />
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Login Screen ───────────────────────────────────────────────────────────
+
+function LoginScreen({ onLogin }: { onLogin: () => void }) {
+  const [isSetup, setIsSetup] = useState(false);
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [error, setError] = useState('');
+  const [showPin, setShowPin] = useState(false);
+
+  useEffect(() => {
+    setIsSetup(!hasLoginPin());
+  }, []);
+
+  const handleSubmit = () => {
+    if (isSetup) {
+      if (pin.length < 4) {
+        setError('PIN must be at least 4 digits');
+        return;
+      }
+      if (pin !== confirmPin) {
+        setError('PINs do not match');
+        return;
+      }
+      setLoginPin(pin);
+      onLogin();
+    } else {
+      if (verifyLoginPin(pin)) {
+        onLogin();
+      } else {
+        setError('Incorrect PIN');
+        setPin('');
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1B2A4A] to-[#0F1A2E] p-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-sm"
+      >
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-[#FF6B35] rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Radio className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-1">DDL Retailer</h1>
+          <p className="text-gray-400 text-sm">Direct Demand-to-Logistics</p>
+        </div>
+
+        <div className="bg-white rounded-3xl p-6 shadow-2xl">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-[#FF6B35]/10 rounded-xl flex items-center justify-center">
+              <Lock className="w-5 h-5 text-[#FF6B35]" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">{isSetup ? 'Create PIN' : 'Welcome Back'}</h2>
+              <p className="text-xs text-gray-400">{isSetup ? 'Set a PIN to secure your app' : 'Enter your PIN to continue'}</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                {isSetup ? 'Create PIN' : 'Enter PIN'}
+              </label>
+              <div className="relative">
+                <input
+                  type={showPin ? 'text' : 'password'}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={pin}
+                  onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError(''); }}
+                  placeholder={isSetup ? 'Enter 4+ digit PIN' : 'Enter your PIN'}
+                  className="w-full px-4 pr-10 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-lg font-mono text-center tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-[#FF6B35] focus:border-transparent"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+                />
+                <button onClick={() => setShowPin(!showPin)} className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {showPin ? <EyeOff className="w-4 h-4 text-gray-400" /> : <Eye className="w-4 h-4 text-gray-400" />}
+                </button>
+              </div>
+            </div>
+
+            {isSetup && (
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Confirm PIN</label>
+                <input
+                  type={showPin ? 'text' : 'password'}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={confirmPin}
+                  onChange={(e) => { setConfirmPin(e.target.value.replace(/\D/g, '')); setError(''); }}
+                  placeholder="Confirm your PIN"
+                  className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-lg font-mono text-center tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-[#FF6B35] focus:border-transparent"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+                />
+              </div>
+            )}
+
+            {error && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
+                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                <p className="text-xs text-red-600 font-medium">{error}</p>
+              </div>
+            )}
+
+            <button
+              onClick={handleSubmit}
+              className="w-full py-3.5 rounded-xl bg-[#FF6B35] text-white font-semibold text-sm active:bg-[#E55A2B] transition-colors flex items-center justify-center gap-2"
+            >
+              {isSetup ? (
+                <>
+                  <Shield className="w-4 h-4" />
+                  Set PIN & Continue
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4" />
+                  Unlock
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        <p className="text-center text-[10px] text-gray-500 mt-6">Bugolobi, Kampala · DDL Platform v2.0</p>
+      </motion.div>
     </div>
   );
 }
@@ -302,8 +457,12 @@ function SignalModal({
 
         <div className="px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center">
-              <span className="text-2xl">{CATEGORY_ICONS[product.category] || '📦'}</span>
+            <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center overflow-hidden">
+              {product.imageUrl ? (
+                <img src={product.imageUrl} alt={product.productLabel} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              ) : (
+                <span className="text-2xl">{CATEGORY_ICONS[product.category] || '📦'}</span>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-mono text-xs text-gray-400">{product.productId}</p>
@@ -421,6 +580,8 @@ function SignalsScreen({
   onSync,
   isSyncing,
   supplierConnected,
+  onDeleteSignal,
+  onCancelSignal,
 }: {
   signals: DemandSignal[];
   products: Product[];
@@ -428,6 +589,8 @@ function SignalsScreen({
   onSync: () => void;
   isSyncing: boolean;
   supplierConnected: boolean;
+  onDeleteSignal: (signalId: string) => void;
+  onCancelSignal: (signalId: string) => void;
 }) {
   const unsynced = signals.filter((s) => !s.isSynced);
   const activeSignals = signals.filter((s) => s.status !== 'delivered' && s.status !== 'cancelled');
@@ -458,7 +621,13 @@ function SignalsScreen({
           <div className="grid grid-cols-4 gap-2">
             {products.slice(0, 8).map((product) => (
               <button key={product.id} onClick={() => onCreateSignal(product)} className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white border border-gray-100 active:scale-95 transition-transform">
-                <span className="text-lg">{CATEGORY_ICONS[product.category] || '📦'}</span>
+                <div className="w-8 h-8 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center">
+                  {product.imageUrl ? (
+                    <img src={product.imageUrl} alt={product.productLabel} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  ) : (
+                    <span className="text-lg">{CATEGORY_ICONS[product.category] || '📦'}</span>
+                  )}
+                </div>
                 <span className="text-[9px] font-medium text-gray-600 truncate w-full text-center">{product.productLabel.split(' ')[0]}</span>
               </button>
             ))}
@@ -477,7 +646,7 @@ function SignalsScreen({
           <div className="space-y-2">
             {activeSignals.map((signal) => (
               <div key={signal.id} className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-2xl">
-                <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
                   <span className="text-lg">{CATEGORY_ICONS[signal.productCategory] || '📦'}</span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -501,6 +670,22 @@ function SignalsScreen({
                 <div className="flex flex-col items-end gap-1">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${URGENCY_COLORS[signal.urgency]}`}>{signal.urgency}</span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_COLORS[signal.status]}`}>{STATUS_LABELS[signal.status]}</span>
+                  <div className="flex gap-1 mt-1">
+                    <button
+                      onClick={() => onCancelSignal(signal.signalId)}
+                      className="p-1 rounded-lg bg-amber-50 text-amber-600 active:bg-amber-100 transition-colors"
+                      title="Cancel signal"
+                    >
+                      <Ban className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => onDeleteSignal(signal.signalId)}
+                      className="p-1 rounded-lg bg-red-50 text-red-600 active:bg-red-100 transition-colors"
+                      title="Delete signal"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -513,7 +698,15 @@ function SignalsScreen({
 
 // ─── History Screen ──────────────────────────────────────────────────────────
 
-function HistoryScreen({ signals }: { signals: DemandSignal[] }) {
+function HistoryScreen({
+  signals,
+  onDeleteSignal,
+  onCancelSignal,
+}: {
+  signals: DemandSignal[];
+  onDeleteSignal: (signalId: string) => void;
+  onCancelSignal: (signalId: string) => void;
+}) {
   const [filter, setFilter] = useState('all');
 
   const filtered = signals.filter((s) => {
@@ -521,6 +714,7 @@ function HistoryScreen({ signals }: { signals: DemandSignal[] }) {
     if (filter === 'pending') return s.status === 'pending' || s.status === 'synced';
     if (filter === 'active') return s.status === 'assigned' || s.status === 'in_transit';
     if (filter === 'completed') return s.status === 'delivered';
+    if (filter === 'cancelled') return s.status === 'cancelled';
     return true;
   });
 
@@ -545,6 +739,7 @@ function HistoryScreen({ signals }: { signals: DemandSignal[] }) {
             { key: 'pending', label: 'Pending' },
             { key: 'active', label: 'Active' },
             { key: 'completed', label: 'Done' },
+            { key: 'cancelled', label: 'Cancelled' },
           ].map((f) => (
             <button key={f.key} onClick={() => setFilter(f.key)} className={`px-3 py-1.5 text-[11px] font-semibold rounded-full transition-all ${filter === f.key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'}`}>
               {f.label}
@@ -587,6 +782,24 @@ function HistoryScreen({ signals }: { signals: DemandSignal[] }) {
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_COLORS[signal.status]}`}>{STATUS_LABELS[signal.status]}</span>
                     <span className="text-[9px] text-gray-300">{dateStr} {timeStr}</span>
+                    {signal.status !== 'delivered' && signal.status !== 'cancelled' && (
+                      <div className="flex gap-1 mt-0.5">
+                        <button
+                          onClick={() => onCancelSignal(signal.signalId)}
+                          className="p-1 rounded-lg bg-amber-50 text-amber-600 active:bg-amber-100 transition-colors"
+                          title="Cancel signal"
+                        >
+                          <Ban className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => onDeleteSignal(signal.signalId)}
+                          className="p-1 rounded-lg bg-red-50 text-red-600 active:bg-red-100 transition-colors"
+                          title="Delete signal"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -754,6 +967,7 @@ function ProfileScreen({
   connection,
   onOpenConnectionSettings,
   lastSyncResult,
+  onLogout,
 }: {
   profile: RetailerProfile | null;
   unsyncedCount: number;
@@ -765,6 +979,7 @@ function ProfileScreen({
   connection: ConnectionSettings;
   onOpenConnectionSettings: () => void;
   lastSyncResult: string | null;
+  onLogout: () => void;
 }) {
   const connected = isSupplierConnected();
 
@@ -858,6 +1073,15 @@ function ProfileScreen({
           })}
         </div>
 
+        {/* Logout Button */}
+        <button
+          onClick={onLogout}
+          className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-red-600 font-semibold text-sm active:bg-red-100 transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Lock App
+        </button>
+
         <div className="mt-6 text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
             <div className="w-6 h-6 bg-[#FF6B35] rounded-lg flex items-center justify-center">
@@ -876,6 +1100,7 @@ function ProfileScreen({
 // ─── Main App ────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('inventory');
   const [products, setProducts] = useState<Product[]>([]);
   const [signals, setSignals] = useState<DemandSignal[]>([]);
@@ -890,8 +1115,10 @@ export default function Home() {
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState<string | null>(null);
 
-  // Initialize data
+  // Login check
   useEffect(() => {
+    if (!isLoggedIn) return;
+    // Load data only after login
     async function initData() {
       try {
         seedLocalData();
@@ -938,7 +1165,7 @@ export default function Home() {
       }
     }
     initData();
-  }, []);
+  }, [isLoggedIn]);
 
   // Monitor online status
   useEffect(() => {
@@ -958,7 +1185,6 @@ export default function Home() {
     if (!isOnline || !connection.supplierApiUrl || !connection.autoSync) return;
     const unsynced = getLocalSignals().filter(s => !s.isSynced);
     if (unsynced.length === 0) return;
-    // Auto-sync after a short delay
     const timer = setTimeout(() => {
       handleSync();
     }, 3000);
@@ -972,10 +1198,8 @@ export default function Home() {
       if (!selectedProduct) return;
       setIsSubmitting(true);
       try {
-        // Capture GPS position
         const position = await getCurrentPosition();
 
-        // Always save to localStorage first (instant, works offline)
         const newSignal = createLocalSignal({
           productLabel: selectedProduct.productLabel,
           productId: selectedProduct.productId,
@@ -992,7 +1216,6 @@ export default function Home() {
         });
         setSignals((prev) => [newSignal, ...prev]);
 
-        // Also try API if in web mode
         if (!nativeMode) {
           try {
             await fetch('/api/signals', {
@@ -1036,7 +1259,6 @@ export default function Home() {
       const currentProfile = profile || getLocalProfile();
 
       if (isSupplierConnected()) {
-        // Real sync to supplier API
         const result = await syncToSupplierApi(connection, currentProfile);
         if (result.synced > 0) {
           setLastSyncResult(`Synced ${result.synced} signal${result.synced !== 1 ? 's' : ''} to supplier`);
@@ -1048,14 +1270,12 @@ export default function Home() {
           setLastSyncResult('All signals already synced');
         }
       } else {
-        // Local-only sync
         const result = syncLocalSignals();
         setLastSyncResult(`Marked ${result.synced} signal${result.synced !== 1 ? 's' : ''} as synced (local only)`);
       }
 
       setSignals(getLocalSignals());
 
-      // Also try API sync in web mode
       if (!nativeMode) {
         try {
           await fetch('/api/sync', { method: 'POST' });
@@ -1079,6 +1299,29 @@ export default function Home() {
     setConnection(settings);
     setShowConnectionModal(false);
   }, []);
+
+  // Delete signal
+  const handleDeleteSignal = useCallback((signalId: string) => {
+    deleteLocalSignal(signalId);
+    setSignals(getLocalSignals());
+  }, []);
+
+  // Cancel signal
+  const handleCancelSignal = useCallback((signalId: string) => {
+    cancelLocalSignal(signalId);
+    setSignals(getLocalSignals());
+  }, []);
+
+  // Logout - lock the app
+  const handleLogout = useCallback(() => {
+    setIsLoggedIn(false);
+    setIsLoading(true);
+  }, []);
+
+  // Login screen
+  if (!isLoggedIn) {
+    return <LoginScreen onLogin={() => setIsLoggedIn(true)} />;
+  }
 
   const unsyncedCount = signals.filter((s) => !s.isSynced).length;
   const supplierConnected = isSupplierConnected();
@@ -1116,9 +1359,9 @@ export default function Home() {
             className="h-full"
           >
             {activeTab === 'inventory' && <InventoryScreen products={products} onSelectProduct={setSelectedProduct} />}
-            {activeTab === 'signals' && <SignalsScreen signals={signals} products={products} onCreateSignal={setSelectedProduct} onSync={handleSync} isSyncing={isSyncing} supplierConnected={supplierConnected} />}
-            {activeTab === 'history' && <HistoryScreen signals={signals} />}
-            {activeTab === 'profile' && <ProfileScreen profile={profile} unsyncedCount={unsyncedCount} totalSignals={signals.length} isOnline={isOnline} onSync={handleSync} isSyncing={isSyncing} nativeMode={nativeMode} connection={connection} onOpenConnectionSettings={() => setShowConnectionModal(true)} lastSyncResult={lastSyncResult} />}
+            {activeTab === 'signals' && <SignalsScreen signals={signals} products={products} onCreateSignal={setSelectedProduct} onSync={handleSync} isSyncing={isSyncing} supplierConnected={supplierConnected} onDeleteSignal={handleDeleteSignal} onCancelSignal={handleCancelSignal} />}
+            {activeTab === 'history' && <HistoryScreen signals={signals} onDeleteSignal={handleDeleteSignal} onCancelSignal={handleCancelSignal} />}
+            {activeTab === 'profile' && <ProfileScreen profile={profile} unsyncedCount={unsyncedCount} totalSignals={signals.length} isOnline={isOnline} onSync={handleSync} isSyncing={isSyncing} nativeMode={nativeMode} connection={connection} onOpenConnectionSettings={() => setShowConnectionModal(true)} lastSyncResult={lastSyncResult} onLogout={handleLogout} />}
           </motion.div>
         </AnimatePresence>
       </div>

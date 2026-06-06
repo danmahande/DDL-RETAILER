@@ -17,6 +17,7 @@ export interface LocalProduct {
   minStock: number;
   merchantName: string | null;
   isActive: boolean;
+  imageUrl: string | null;
 }
 
 export interface LocalDemandSignal {
@@ -64,6 +65,7 @@ const SIGNALS_KEY = 'ddl_signals';
 const PROFILE_KEY = 'ddl_profile';
 const SEEDED_KEY = 'ddl_seeded';
 const CONNECTION_KEY = 'ddl_connection';
+const LOGIN_KEY = 'ddl_login_pin';
 
 const DEFAULT_CONNECTION: ConnectionSettings = {
   supplierApiUrl: '',
@@ -74,31 +76,58 @@ const DEFAULT_CONNECTION: ConnectionSettings = {
 
 // ─── Demo Data ─────────────────────────────────────────────────────────────
 
+const PRODUCT_IMAGES: Record<string, string> = {
+  'BV-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Coca-Cola_bottle.svg/200px-Coca-Cola_bottle.svg.png',
+  'BV-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Rwenzori_Bottled_Water.jpg/200px-Rwenzori_Bottled_Water.jpg',
+  'BV-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Minute_Maid_logo.svg/200px-Minute_Maid_logo.svg.png',
+  'BV-04': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Nile_Breweries_Limited_logo.svg/200px-Nile_Breweries_Limited_logo.svg.png',
+  'GR-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Kakira_Sugar_logo.svg/200px-Kakira_Sugar_logo.svg.png',
+  'GR-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Tilda_Rice_logo.svg/200px-Tilda_Rice_logo.svg.png',
+  'GR-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Mukwano_logo.svg/200px-Mukwano_logo.svg.png',
+  'GR-04': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Red_kidney_beans.jpg/220px-Red_kidney_beans.jpg',
+  'GR-05': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Mukwano_logo.svg/200px-Mukwano_logo.svg.png',
+  'GR-06': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Kensalt_Kenya.jpg/200px-Kensalt_Kenya.jpg',
+  'DR-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Fresh_Dairy_Uganda_logo.svg/200px-Fresh_Dairy_Uganda_logo.svg.png',
+  'DR-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Brookside_Dairy_logo.svg/200px-Brookside_Dairy_logo.svg.png',
+  'DR-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Brookside_Dairy_logo.svg/200px-Brookside_Dairy_logo.svg.png',
+  'BK-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Bread_-_Wikimedia_Commons.jpg/220px-Bread_-_Wikimedia_Commons.jpg',
+  'BK-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Bread_roll_-_Wikimedia_Commons.jpg/220px-Bread_roll_-_Wikimedia_Commons.jpg',
+  'SN-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Britannia_Industries_logo.svg/200px-Britannia_Industries_logo.svg.png',
+  'SN-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/Potato_chips.jpg/220px-Potato_chips.jpg',
+  'SN-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Peanuts.jpg/220px-Peanuts.jpg',
+  'CL-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Movit_Products_Uganda.jpg/200px-Movit_Products_Uganda.jpg',
+  'CL-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Ariel_detergent.jpg/220px-Ariel_detergent.jpg',
+  'CL-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Jik_Bleach.jpg/200px-Jik_Bleach.jpg',
+  'PC-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Colgate_logo.svg/200px-Colgate_logo.svg.png',
+  'PC-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Toilet_paper.jpg/220px-Toilet_paper.jpg',
+  'PC-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Vaseline_logo.svg/200px-Vaseline_logo.svg.png',
+};
+
 const DEMO_PRODUCTS: LocalProduct[] = [
-  { id: '1', productId: 'BV-01', productLabel: 'Soda 500ml', brand: 'Coca-Cola', category: 'Beverages', unit: '500ml', priceTier: 'budget', packageSize: 'small', unitCost: 800, unitPrice: 1200, currentStock: 245, minStock: 50, merchantName: "Mama Johnson's", isActive: true },
-  { id: '2', productId: 'BV-02', productLabel: 'Mineral Water 1L', brand: 'Rwenzori', category: 'Beverages', unit: '1L', priceTier: 'budget', packageSize: 'medium', unitCost: 600, unitPrice: 1000, currentStock: 180, minStock: 40, merchantName: "Mama Johnson's", isActive: true },
-  { id: '3', productId: 'BV-03', productLabel: 'Orange Juice 1L', brand: 'Minute Maid', category: 'Beverages', unit: '1L', priceTier: 'mid-range', packageSize: 'medium', unitCost: 2500, unitPrice: 3500, currentStock: 45, minStock: 20, merchantName: 'Kampala Corner', isActive: true },
-  { id: '4', productId: 'BV-04', productLabel: 'Beer 500ml', brand: 'Nile Special', category: 'Beverages', unit: '500ml', priceTier: 'mid-range', packageSize: 'small', unitCost: 2000, unitPrice: 3000, currentStock: 96, minStock: 30, merchantName: 'Kampala Corner', isActive: true },
-  { id: '5', productId: 'GR-01', productLabel: 'Sugar 1kg', brand: 'Kakira', category: 'Groceries', unit: '1kg', priceTier: 'budget', packageSize: 'medium', unitCost: 3200, unitPrice: 4000, currentStock: 89, minStock: 30, merchantName: "Mama Johnson's", isActive: true },
-  { id: '6', productId: 'GR-02', productLabel: 'Rice 2kg', brand: 'Tilda', category: 'Groceries', unit: '2kg', priceTier: 'mid-range', packageSize: 'large', unitCost: 5500, unitPrice: 7000, currentStock: 67, minStock: 25, merchantName: "Mama Johnson's", isActive: true },
-  { id: '7', productId: 'GR-03', productLabel: 'Posho 5kg', brand: 'Mukwano', category: 'Groceries', unit: '5kg', priceTier: 'budget', packageSize: 'bulk', unitCost: 8000, unitPrice: 10500, currentStock: 34, minStock: 15, merchantName: 'Kampala Corner', isActive: true },
-  { id: '8', productId: 'GR-04', productLabel: 'Beans 1kg', brand: 'Nile', category: 'Groceries', unit: '1kg', priceTier: 'budget', packageSize: 'medium', unitCost: 2500, unitPrice: 3500, currentStock: 78, minStock: 25, merchantName: 'Kampala Corner', isActive: true },
-  { id: '9', productId: 'GR-05', productLabel: 'Cooking Oil 2L', brand: 'Mukwano', category: 'Groceries', unit: '2L', priceTier: 'mid-range', packageSize: 'large', unitCost: 8500, unitPrice: 10500, currentStock: 3, minStock: 15, merchantName: "Mama Johnson's", isActive: true },
-  { id: '10', productId: 'GR-06', productLabel: 'Salt 500g', brand: 'Kengrow', category: 'Groceries', unit: '500g', priceTier: 'budget', packageSize: 'small', unitCost: 400, unitPrice: 800, currentStock: 200, minStock: 50, merchantName: 'Kampala Corner', isActive: true },
-  { id: '11', productId: 'DR-01', productLabel: 'Milk 1L', brand: 'Fresh Dairy', category: 'Dairy', unit: '1L', priceTier: 'budget', packageSize: 'medium', unitCost: 1800, unitPrice: 2400, currentStock: 42, minStock: 20, merchantName: "Mama Johnson's", isActive: true },
-  { id: '12', productId: 'DR-02', productLabel: 'Butter 250g', brand: 'Brookside', category: 'Dairy', unit: '250g', priceTier: 'mid-range', packageSize: 'small', unitCost: 3000, unitPrice: 4000, currentStock: 28, minStock: 10, merchantName: "Mama Johnson's", isActive: true },
-  { id: '13', productId: 'DR-03', productLabel: 'Yoghurt 500ml', brand: 'Brookside', category: 'Dairy', unit: '500ml', priceTier: 'mid-range', packageSize: 'small', unitCost: 2200, unitPrice: 3000, currentStock: 55, minStock: 15, merchantName: 'Kampala Corner', isActive: true },
-  { id: '14', productId: 'BK-01', productLabel: 'Bread', brand: 'Hot Loaf', category: 'Bakery', unit: 'loaf', priceTier: 'budget', packageSize: 'medium', unitCost: 1500, unitPrice: 2000, currentStock: 12, minStock: 20, merchantName: 'Bugolobi Stall 12', isActive: true },
-  { id: '15', productId: 'BK-02', productLabel: 'Rolls (6 pack)', brand: 'Hot Loaf', category: 'Bakery', unit: '6 pack', priceTier: 'budget', packageSize: 'medium', unitCost: 2000, unitPrice: 2800, currentStock: 30, minStock: 15, merchantName: 'Bugolobi Stall 12', isActive: true },
-  { id: '16', productId: 'SN-01', productLabel: 'Biscuits 200g', brand: 'Britannia', category: 'Snacks', unit: '200g', priceTier: 'budget', packageSize: 'small', unitCost: 800, unitPrice: 1200, currentStock: 150, minStock: 40, merchantName: "Mama Johnson's", isActive: true },
-  { id: '17', productId: 'SN-02', productLabel: 'Chips 150g', brand: 'Nkosi', category: 'Snacks', unit: '150g', priceTier: 'budget', packageSize: 'sachet', unitCost: 500, unitPrice: 800, currentStock: 220, minStock: 50, merchantName: 'Kampala Corner', isActive: true },
-  { id: '18', productId: 'SN-03', productLabel: 'Peanuts 250g', brand: 'Local', category: 'Snacks', unit: '250g', priceTier: 'budget', packageSize: 'small', unitCost: 1200, unitPrice: 1800, currentStock: 95, minStock: 30, merchantName: 'Bugolobi Stall 12', isActive: true },
-  { id: '19', productId: 'CL-01', productLabel: 'Soap Bar', brand: 'Movit', category: 'Cleaning', unit: 'bar', priceTier: 'budget', packageSize: 'sachet', unitCost: 600, unitPrice: 1000, currentStock: 300, minStock: 60, merchantName: "Mama Johnson's", isActive: true },
-  { id: '20', productId: 'CL-02', productLabel: 'Detergent 1kg', brand: 'Ariel', category: 'Cleaning', unit: '1kg', priceTier: 'mid-range', packageSize: 'medium', unitCost: 4000, unitPrice: 5500, currentStock: 85, minStock: 25, merchantName: 'Kampala Corner', isActive: true },
-  { id: '21', productId: 'CL-03', productLabel: 'Bleach 1L', brand: 'Jik', category: 'Cleaning', unit: '1L', priceTier: 'budget', packageSize: 'medium', unitCost: 1800, unitPrice: 2500, currentStock: 60, minStock: 20, merchantName: "Mama Johnson's", isActive: true },
-  { id: '22', productId: 'PC-01', productLabel: 'Toothpaste 100g', brand: 'Colgate', category: 'Personal Care', unit: '100g', priceTier: 'budget', packageSize: 'small', unitCost: 1500, unitPrice: 2200, currentStock: 110, minStock: 30, merchantName: "Mama Johnson's", isActive: true },
-  { id: '23', productId: 'PC-02', productLabel: 'Toilet Paper 4-roll', brand: 'Rose', category: 'Personal Care', unit: '4-roll', priceTier: 'budget', packageSize: 'medium', unitCost: 2000, unitPrice: 3000, currentStock: 75, minStock: 25, merchantName: 'Kampala Corner', isActive: true },
-  { id: '24', productId: 'PC-03', productLabel: 'Petroleum Jelly 100g', brand: 'Vaseline', category: 'Personal Care', unit: '100g', priceTier: 'budget', packageSize: 'small', unitCost: 1200, unitPrice: 1800, currentStock: 88, minStock: 30, merchantName: "Mama Johnson's", isActive: true },
+  { id: '1', productId: 'BV-01', productLabel: 'Soda 500ml', brand: 'Coca-Cola', category: 'Beverages', unit: '500ml', priceTier: 'budget', packageSize: 'small', unitCost: 800, unitPrice: 1200, currentStock: 245, minStock: 50, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['BV-01'] },
+  { id: '2', productId: 'BV-02', productLabel: 'Mineral Water 1L', brand: 'Rwenzori', category: 'Beverages', unit: '1L', priceTier: 'budget', packageSize: 'medium', unitCost: 600, unitPrice: 1000, currentStock: 180, minStock: 40, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['BV-02'] },
+  { id: '3', productId: 'BV-03', productLabel: 'Orange Juice 1L', brand: 'Minute Maid', category: 'Beverages', unit: '1L', priceTier: 'mid-range', packageSize: 'medium', unitCost: 2500, unitPrice: 3500, currentStock: 45, minStock: 20, merchantName: 'Kampala Corner', isActive: true, imageUrl: PRODUCT_IMAGES['BV-03'] },
+  { id: '4', productId: 'BV-04', productLabel: 'Beer 500ml', brand: 'Nile Special', category: 'Beverages', unit: '500ml', priceTier: 'mid-range', packageSize: 'small', unitCost: 2000, unitPrice: 3000, currentStock: 96, minStock: 30, merchantName: 'Kampala Corner', isActive: true, imageUrl: PRODUCT_IMAGES['BV-04'] },
+  { id: '5', productId: 'GR-01', productLabel: 'Sugar 1kg', brand: 'Kakira', category: 'Groceries', unit: '1kg', priceTier: 'budget', packageSize: 'medium', unitCost: 3200, unitPrice: 4000, currentStock: 89, minStock: 30, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['GR-01'] },
+  { id: '6', productId: 'GR-02', productLabel: 'Rice 2kg', brand: 'Tilda', category: 'Groceries', unit: '2kg', priceTier: 'mid-range', packageSize: 'large', unitCost: 5500, unitPrice: 7000, currentStock: 67, minStock: 25, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['GR-02'] },
+  { id: '7', productId: 'GR-03', productLabel: 'Posho 5kg', brand: 'Mukwano', category: 'Groceries', unit: '5kg', priceTier: 'budget', packageSize: 'bulk', unitCost: 8000, unitPrice: 10500, currentStock: 34, minStock: 15, merchantName: 'Kampala Corner', isActive: true, imageUrl: PRODUCT_IMAGES['GR-03'] },
+  { id: '8', productId: 'GR-04', productLabel: 'Beans 1kg', brand: 'Nile', category: 'Groceries', unit: '1kg', priceTier: 'budget', packageSize: 'medium', unitCost: 2500, unitPrice: 3500, currentStock: 78, minStock: 25, merchantName: 'Kampala Corner', isActive: true, imageUrl: PRODUCT_IMAGES['GR-04'] },
+  { id: '9', productId: 'GR-05', productLabel: 'Cooking Oil 2L', brand: 'Mukwano', category: 'Groceries', unit: '2L', priceTier: 'mid-range', packageSize: 'large', unitCost: 8500, unitPrice: 10500, currentStock: 3, minStock: 15, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['GR-05'] },
+  { id: '10', productId: 'GR-06', productLabel: 'Salt 500g', brand: 'Kengrow', category: 'Groceries', unit: '500g', priceTier: 'budget', packageSize: 'small', unitCost: 400, unitPrice: 800, currentStock: 200, minStock: 50, merchantName: 'Kampala Corner', isActive: true, imageUrl: PRODUCT_IMAGES['GR-06'] },
+  { id: '11', productId: 'DR-01', productLabel: 'Milk 1L', brand: 'Fresh Dairy', category: 'Dairy', unit: '1L', priceTier: 'budget', packageSize: 'medium', unitCost: 1800, unitPrice: 2400, currentStock: 42, minStock: 20, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['DR-01'] },
+  { id: '12', productId: 'DR-02', productLabel: 'Butter 250g', brand: 'Brookside', category: 'Dairy', unit: '250g', priceTier: 'mid-range', packageSize: 'small', unitCost: 3000, unitPrice: 4000, currentStock: 28, minStock: 10, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['DR-02'] },
+  { id: '13', productId: 'DR-03', productLabel: 'Yoghurt 500ml', brand: 'Brookside', category: 'Dairy', unit: '500ml', priceTier: 'mid-range', packageSize: 'small', unitCost: 2200, unitPrice: 3000, currentStock: 55, minStock: 15, merchantName: 'Kampala Corner', isActive: true, imageUrl: PRODUCT_IMAGES['DR-03'] },
+  { id: '14', productId: 'BK-01', productLabel: 'Bread', brand: 'Hot Loaf', category: 'Bakery', unit: 'loaf', priceTier: 'budget', packageSize: 'medium', unitCost: 1500, unitPrice: 2000, currentStock: 12, minStock: 20, merchantName: 'Bugolobi Stall 12', isActive: true, imageUrl: PRODUCT_IMAGES['BK-01'] },
+  { id: '15', productId: 'BK-02', productLabel: 'Rolls (6 pack)', brand: 'Hot Loaf', category: 'Bakery', unit: '6 pack', priceTier: 'budget', packageSize: 'medium', unitCost: 2000, unitPrice: 2800, currentStock: 30, minStock: 15, merchantName: 'Bugolobi Stall 12', isActive: true, imageUrl: PRODUCT_IMAGES['BK-02'] },
+  { id: '16', productId: 'SN-01', productLabel: 'Biscuits 200g', brand: 'Britannia', category: 'Snacks', unit: '200g', priceTier: 'budget', packageSize: 'small', unitCost: 800, unitPrice: 1200, currentStock: 150, minStock: 40, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['SN-01'] },
+  { id: '17', productId: 'SN-02', productLabel: 'Chips 150g', brand: 'Nkosi', category: 'Snacks', unit: '150g', priceTier: 'budget', packageSize: 'sachet', unitCost: 500, unitPrice: 800, currentStock: 220, minStock: 50, merchantName: 'Kampala Corner', isActive: true, imageUrl: PRODUCT_IMAGES['SN-02'] },
+  { id: '18', productId: 'SN-03', productLabel: 'Peanuts 250g', brand: 'Local', category: 'Snacks', unit: '250g', priceTier: 'budget', packageSize: 'small', unitCost: 1200, unitPrice: 1800, currentStock: 95, minStock: 30, merchantName: 'Bugolobi Stall 12', isActive: true, imageUrl: PRODUCT_IMAGES['SN-03'] },
+  { id: '19', productId: 'CL-01', productLabel: 'Soap Bar', brand: 'Movit', category: 'Cleaning', unit: 'bar', priceTier: 'budget', packageSize: 'sachet', unitCost: 600, unitPrice: 1000, currentStock: 300, minStock: 60, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['CL-01'] },
+  { id: '20', productId: 'CL-02', productLabel: 'Detergent 1kg', brand: 'Ariel', category: 'Cleaning', unit: '1kg', priceTier: 'mid-range', packageSize: 'medium', unitCost: 4000, unitPrice: 5500, currentStock: 85, minStock: 25, merchantName: 'Kampala Corner', isActive: true, imageUrl: PRODUCT_IMAGES['CL-02'] },
+  { id: '21', productId: 'CL-03', productLabel: 'Bleach 1L', brand: 'Jik', category: 'Cleaning', unit: '1L', priceTier: 'budget', packageSize: 'medium', unitCost: 1800, unitPrice: 2500, currentStock: 60, minStock: 20, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['CL-03'] },
+  { id: '22', productId: 'PC-01', productLabel: 'Toothpaste 100g', brand: 'Colgate', category: 'Personal Care', unit: '100g', priceTier: 'budget', packageSize: 'small', unitCost: 1500, unitPrice: 2200, currentStock: 110, minStock: 30, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['PC-01'] },
+  { id: '23', productId: 'PC-02', productLabel: 'Toilet Paper 4-roll', brand: 'Rose', category: 'Personal Care', unit: '4-roll', priceTier: 'budget', packageSize: 'medium', unitCost: 2000, unitPrice: 3000, currentStock: 75, minStock: 25, merchantName: 'Kampala Corner', isActive: true, imageUrl: PRODUCT_IMAGES['PC-02'] },
+  { id: '24', productId: 'PC-03', productLabel: 'Petroleum Jelly 100g', brand: 'Vaseline', category: 'Personal Care', unit: '100g', priceTier: 'budget', packageSize: 'small', unitCost: 1200, unitPrice: 1800, currentStock: 88, minStock: 30, merchantName: "Mama Johnson's", isActive: true, imageUrl: PRODUCT_IMAGES['PC-03'] },
 ];
 
 const DEMO_SIGNALS: LocalDemandSignal[] = [
@@ -392,6 +421,47 @@ export async function testSupplierConnection(url: string, apiKey?: string): Prom
     }
     return { ok: false, message: err instanceof Error ? err.message : 'Connection failed' };
   }
+}
+
+// ─── Delete / Cancel Signals ────────────────────────────────────────────────
+
+export function deleteLocalSignal(signalId: string): void {
+  const signals = getLocalSignals();
+  const updated = signals.filter(s => s.signalId !== signalId);
+  setItem(SIGNALS_KEY, updated);
+}
+
+export function cancelLocalSignal(signalId: string): void {
+  const signals = getLocalSignals();
+  const updated = signals.map(s => {
+    if (s.signalId === signalId) {
+      return { ...s, status: 'cancelled' as string };
+    }
+    return s;
+  });
+  setItem(SIGNALS_KEY, updated);
+}
+
+// ─── Login PIN ──────────────────────────────────────────────────────────────
+
+export function getLoginPin(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(LOGIN_KEY);
+}
+
+export function setLoginPin(pin: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(LOGIN_KEY, pin);
+}
+
+export function verifyLoginPin(pin: string): boolean {
+  const stored = getLoginPin();
+  if (!stored) return false;
+  return stored === pin;
+}
+
+export function hasLoginPin(): boolean {
+  return getLoginPin() !== null;
 }
 
 // ─── Native detection ───────────────────────────────────────────────────────
