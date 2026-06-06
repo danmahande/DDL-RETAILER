@@ -63,7 +63,7 @@ export interface ConnectionSettings {
 const PRODUCTS_KEY = 'ddl_products';
 const SIGNALS_KEY = 'ddl_signals';
 const PROFILE_KEY = 'ddl_profile';
-const SEEDED_KEY = 'ddl_seeded';
+const SEEDED_KEY = 'ddl_seeded_v3';
 const CONNECTION_KEY = 'ddl_connection';
 const LOGIN_KEY = 'ddl_login_pin';
 
@@ -76,31 +76,32 @@ const DEFAULT_CONNECTION: ConnectionSettings = {
 
 // ─── Demo Data ─────────────────────────────────────────────────────────────
 
+// Local product images bundled with the app for offline support
 const PRODUCT_IMAGES: Record<string, string> = {
-  'BV-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Coca-Cola_bottle.svg/200px-Coca-Cola_bottle.svg.png',
-  'BV-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Rwenzori_Bottled_Water.jpg/200px-Rwenzori_Bottled_Water.jpg',
-  'BV-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Minute_Maid_logo.svg/200px-Minute_Maid_logo.svg.png',
-  'BV-04': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Nile_Breweries_Limited_logo.svg/200px-Nile_Breweries_Limited_logo.svg.png',
-  'GR-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Kakira_Sugar_logo.svg/200px-Kakira_Sugar_logo.svg.png',
-  'GR-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Tilda_Rice_logo.svg/200px-Tilda_Rice_logo.svg.png',
-  'GR-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Mukwano_logo.svg/200px-Mukwano_logo.svg.png',
-  'GR-04': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Red_kidney_beans.jpg/220px-Red_kidney_beans.jpg',
-  'GR-05': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Mukwano_logo.svg/200px-Mukwano_logo.svg.png',
-  'GR-06': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Kensalt_Kenya.jpg/200px-Kensalt_Kenya.jpg',
-  'DR-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Fresh_Dairy_Uganda_logo.svg/200px-Fresh_Dairy_Uganda_logo.svg.png',
-  'DR-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Brookside_Dairy_logo.svg/200px-Brookside_Dairy_logo.svg.png',
-  'DR-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Brookside_Dairy_logo.svg/200px-Brookside_Dairy_logo.svg.png',
-  'BK-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Bread_-_Wikimedia_Commons.jpg/220px-Bread_-_Wikimedia_Commons.jpg',
-  'BK-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Bread_roll_-_Wikimedia_Commons.jpg/220px-Bread_roll_-_Wikimedia_Commons.jpg',
-  'SN-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Britannia_Industries_logo.svg/200px-Britannia_Industries_logo.svg.png',
-  'SN-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/Potato_chips.jpg/220px-Potato_chips.jpg',
-  'SN-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Peanuts.jpg/220px-Peanuts.jpg',
-  'CL-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Movit_Products_Uganda.jpg/200px-Movit_Products_Uganda.jpg',
-  'CL-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Ariel_detergent.jpg/220px-Ariel_detergent.jpg',
-  'CL-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Jik_Bleach.jpg/200px-Jik_Bleach.jpg',
-  'PC-01': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Colgate_logo.svg/200px-Colgate_logo.svg.png',
-  'PC-02': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Toilet_paper.jpg/220px-Toilet_paper.jpg',
-  'PC-03': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Vaseline_logo.svg/200px-Vaseline_logo.svg.png',
+  'BV-01': '/images/bv-01.png',
+  'BV-02': '/images/bv-02.png',
+  'BV-03': '/images/bv-03.png',
+  'BV-04': '/images/bv-04.png',
+  'GR-01': '/images/gr-01.png',
+  'GR-02': '/images/gr-02.png',
+  'GR-03': '/images/gr-03.png',
+  'GR-04': '/images/gr-04.png',
+  'GR-05': '/images/gr-05.png',
+  'GR-06': '/images/gr-06.png',
+  'DR-01': '/images/dr-01.png',
+  'DR-02': '/images/dr-02.png',
+  'DR-03': '/images/dr-03.png',
+  'BK-01': '/images/bk-01.png',
+  'BK-02': '/images/bk-02.png',
+  'SN-01': '/images/sn-01.png',
+  'SN-02': '/images/sn-02.png',
+  'SN-03': '/images/sn-03.png',
+  'CL-01': '/images/cl-01.png',
+  'CL-02': '/images/cl-02.png',
+  'CL-03': '/images/cl-03.png',
+  'PC-01': '/images/pc-01.png',
+  'PC-02': '/images/pc-02.png',
+  'PC-03': '/images/pc-03.png',
 };
 
 const DEMO_PRODUCTS: LocalProduct[] = [
@@ -186,6 +187,19 @@ export function seedLocalData(): { products: number; signals: number } {
       }));
       setItem(SIGNALS_KEY, migrated);
     }
+
+    // Always refresh product image URLs from the latest demo data
+    // This ensures local bundled images replace any stale external URLs
+    const existingProducts = getItem<LocalProduct[]>(PRODUCTS_KEY, []);
+    const refreshed = existingProducts.map(p => {
+      const demo = DEMO_PRODUCTS.find(d => d.productId === p.productId);
+      if (demo && demo.imageUrl) {
+        return { ...p, imageUrl: demo.imageUrl };
+      }
+      return p;
+    });
+    setItem(PRODUCTS_KEY, refreshed);
+
     return { products: DEMO_PRODUCTS.length, signals: DEMO_SIGNALS.length };
   }
   setItem(PRODUCTS_KEY, DEMO_PRODUCTS);

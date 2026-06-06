@@ -117,7 +117,7 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-// ─── Product image with real photos ─────────────────────────────────────────
+// ─── Product image components ─────────────────────────────────────────────────
 
 function ProductImage({ product, className = '' }: { product: Product; className?: string }) {
   const [imgError, setImgError] = useState(false);
@@ -151,6 +151,58 @@ function ProductImage({ product, className = '' }: { product: Product; className
     </div>
   );
 }
+
+// Small product thumbnail for signal cards — looks up the product image by productId
+function SignalProductThumb({ productId, category, className = '' }: { productId: string; category: string; className?: string }) {
+  const [imgError, setImgError] = useState(false);
+  const icon = CATEGORY_ICONS[category] || '📦';
+  // Look up image URL from the local products list using a static map
+  const imageUrl = PRODUCT_IMAGE_MAP[productId];
+
+  return (
+    <div className={`bg-gray-50 flex items-center justify-center overflow-hidden ${className}`}>
+      {imageUrl && !imgError ? (
+        <img
+          src={imageUrl}
+          alt={productId}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+          loading="lazy"
+        />
+      ) : (
+        <span className="text-lg">{icon}</span>
+      )}
+    </div>
+  );
+}
+
+// Static map of productId -> local image path for signal card thumbnails
+const PRODUCT_IMAGE_MAP: Record<string, string> = {
+  'BV-01': '/images/bv-01.png',
+  'BV-02': '/images/bv-02.png',
+  'BV-03': '/images/bv-03.png',
+  'BV-04': '/images/bv-04.png',
+  'GR-01': '/images/gr-01.png',
+  'GR-02': '/images/gr-02.png',
+  'GR-03': '/images/gr-03.png',
+  'GR-04': '/images/gr-04.png',
+  'GR-05': '/images/gr-05.png',
+  'GR-06': '/images/gr-06.png',
+  'DR-01': '/images/dr-01.png',
+  'DR-02': '/images/dr-02.png',
+  'DR-03': '/images/dr-03.png',
+  'BK-01': '/images/bk-01.png',
+  'BK-02': '/images/bk-02.png',
+  'SN-01': '/images/sn-01.png',
+  'SN-02': '/images/sn-02.png',
+  'SN-03': '/images/sn-03.png',
+  'CL-01': '/images/cl-01.png',
+  'CL-02': '/images/cl-02.png',
+  'CL-03': '/images/cl-03.png',
+  'PC-01': '/images/pc-01.png',
+  'PC-02': '/images/pc-02.png',
+  'PC-03': '/images/pc-03.png',
+};
 
 // ─── Login Screen ───────────────────────────────────────────────────────────
 
@@ -646,9 +698,7 @@ function SignalsScreen({
           <div className="space-y-2">
             {activeSignals.map((signal) => (
               <div key={signal.id} className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-2xl">
-                <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
-                  <span className="text-lg">{CATEGORY_ICONS[signal.productCategory] || '📦'}</span>
-                </div>
+                <SignalProductThumb productId={signal.productId} category={signal.productCategory} className="w-10 h-10 rounded-xl shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <p className="text-sm font-semibold text-gray-900 truncate">{signal.productLabel}</p>
@@ -762,9 +812,7 @@ function HistoryScreen({
               const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
               return (
                 <div key={signal.id} className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-2xl">
-                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shrink-0">
-                    <span className="text-lg">{CATEGORY_ICONS[signal.productCategory] || '📦'}</span>
-                  </div>
+                  <SignalProductThumb productId={signal.productId} category={signal.productCategory} className="w-10 h-10 rounded-xl shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">{signal.productLabel}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
